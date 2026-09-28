@@ -320,8 +320,11 @@ export interface AgentEvent {
   text: string
 }
 
-/** `tour` carries the readable part of a tour that is still being written. */
-export type TaskEvent = AgentEvent | { kind: 'tour'; tour: Tour }
+/**
+ * `tour` carries the readable part of a tour that is still being written; null means the agent is
+ * rewriting the tour from scratch, so earlier previews and any progress keyed to their stops are void.
+ */
+export type TaskEvent = AgentEvent | { kind: 'tour'; tour: Tour | null }
 
 export type ProgressEvent = TaskEvent & { taskId: string }
 

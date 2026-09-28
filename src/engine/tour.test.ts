@@ -111,7 +111,7 @@ describe('previewTour', () => {
     draft(finished)
     onDraft({ kind: 'step', text: 'Read a.ts' })
     expect(
-      events.map((event) => (event.kind === 'tour' ? (event.tour.chapters[0]?.stops.length ?? 0) : event.kind)),
+      events.map((event) => (event.kind === 'tour' ? (event.tour?.chapters[0]?.stops.length ?? 0) : event.kind)),
     ).toEqual([0, 1, 2, 'step'])
   })
 })

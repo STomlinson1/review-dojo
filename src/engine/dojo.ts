@@ -128,6 +128,7 @@ export class Dojo {
     let parsed = parseStructured(result.text, rawTourSchema)
     if (!parsed.success && result.sessionId) {
       task.onEvent({ kind: 'step', text: 'Correcting the tour format' })
+      task.onEvent({ kind: 'tour', tour: null })
       result = await provider.run({
         ...request,
         onEvent: previewTour(session.diff, task.onEvent),

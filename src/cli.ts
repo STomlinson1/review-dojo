@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     onEvent: (event: TaskEvent) => {
       if (event.kind === 'step') log(`  ${event.text}`)
       else if (event.kind === 'text') log(`  » ${event.text.split('\n')[0]}`)
-      else if (event.kind === 'tour') log(`  ${tourStops(event.tour).length} stops written`)
+      else if (event.kind === 'tour' && event.tour) log(`  ${tourStops(event.tour).length} stops written`)
     },
   }
   const session = await dojo.openPullRequest(target, task)
