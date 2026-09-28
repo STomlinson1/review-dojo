@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Diff, DiffFile } from '../shared/types'
-import { normalizeTour, type RawTour } from './tour'
+import { normalizeTour, partialTour, type RawTour } from './tour'
 
 function file(path: string, hunkIds: string[], isGenerated = false): DiffFile {
   return {
@@ -82,5 +82,19 @@ describe('normalizeTour', () => {
     const ids = tour.chapters.flatMap((chapter) => chapter.stops.map((entry) => entry.id))
     expect(new Set(ids).size).toBe(ids.length)
     expect(tour.intent.unexplained[0].hunkIds).toEqual(['H3'])
+  })
+})
+
+describe('partialTour', () => {
+  it('exposes only fully written stops while the agent is still writing', () => {
+    const finished = JSON.stringify(raw([stop(['H1'], 'first'), stop(['H2'], 'second')]))
+    const cutInsideSecondStop = finished.slice(0, finished.indexOf('"second"') + 4)
+    const tour = partialTour(`Exploring done.\n${cutInsideSecondStop}`, diff)
+    expect(tour?.chapters.flatMap((chapter) => chapter.stops.map((entry) => entry.title))).toEqual(['first'])
+    expect(tour?.chapters.map((chapter) => chapter.title)).toEqual(['Core'])
+  })
+
+  it('waits until the summary is complete', () => {
+    expect(partialTour('{"summary": "The PR chan', diff)).toBeNull()
   })
 })

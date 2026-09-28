@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { closeTruncatedJson, parseModelJson } from './json'
 import { selectHunks } from '../shared/tour'
 import type { Chapter, CodeLocation, Diff, Hunk, Risk, Stop, Tour } from '../shared/types'
 
@@ -60,8 +61,42 @@ export const tourJsonSchema: Record<string, unknown> = tourJsonSchemaBody
 const UNCOVERED_EXPLANATION =
   "The tour didn't place these changes in any stop. Read them directly and make sure they belong in this PR."
 
+const chapterDraftSchema = z.object({ title: z.string(), goal: z.string(), stops: z.array(z.unknown()) })
+const tourDraftSchema = z.object({ summary: z.string(), chapters: z.array(z.unknown()).default([]) })
+const stopSchema = rawTourSchema.shape.chapters.element.shape.stops.element
+
+/** The fully written part of a tour the agent is still writing, or null before it says anything usable. */
+export function partialTour(text: string, diff: Diff): Tour | null {
+  const closed = closeTruncatedJson(text)
+  if (!closed) return null
+  let value: unknown
+  try {
+    value = parseModelJson(closed)
+  } catch {
+    return null
+  }
+  const draft = tourDraftSchema.safeParse(value)
+  if (!draft.success) return null
+  const intent = rawTourSchema.shape.intent.safeParse((value as { intent?: unknown }).intent)
+  const chapters = draft.data.chapters.flatMap((entry) => {
+    const chapter = chapterDraftSchema.safeParse(entry)
+    if (!chapter.success) return []
+    const stops = chapter.data.stops.flatMap((stop) => {
+      const parsed = stopSchema.safeParse(stop)
+      return parsed.success ? [parsed.data] : []
+    })
+    return stops.length > 0 ? [{ ...chapter.data, stops }] : []
+  })
+  const raw: RawTour = {
+    summary: draft.data.summary,
+    intent: intent.success ? intent.data : { stated: [], claims: [], unexplained: [] },
+    chapters,
+  }
+  return normalizeTour(raw, diff, { coverLeftovers: false })
+}
+
 /** Every hunk the agent leaves unclaimed lands in a trailing chapter so nothing in the diff escapes review. */
-export function normalizeTour(raw: RawTour, diff: Diff): Tour {
+export function normalizeTour(raw: RawTour, diff: Diff, { coverLeftovers = true } = {}): Tour {
   const hunks = new Map(diff.files.flatMap((file) => file.hunks.map((hunk) => [hunk.id, hunk])))
   const claimed = new Set<string>()
   let stopCount = 0
@@ -90,7 +125,7 @@ export function normalizeTour(raw: RawTour, diff: Diff): Tour {
     }
   }
 
-  const leftovers = selectHunks(diff, (hunk) => !claimed.has(hunk.id))
+  const leftovers = coverLeftovers ? selectHunks(diff, (hunk) => !claimed.has(hunk.id)) : []
 
   const uncovered = leftovers.filter((entry) => !entry.file.isGenerated)
   if (uncovered.length > 0) {

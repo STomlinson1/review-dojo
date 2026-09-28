@@ -56,3 +56,40 @@ export function parseStructured<T>(text: string, schema: ZodType<T>): Parsed<T> 
     return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
+
+/**
+ * Cuts a JSON document that is still being written back to its last complete member and closes the
+ * open containers, so everything finished so far can be parsed.
+ */
+export function closeTruncatedJson(text: string): string | null {
+  const start = text.indexOf('{')
+  if (start === -1) return null
+  const closers: string[] = []
+  let inString = false
+  let escaped = false
+  let cut = -1
+  let closersAtCut: string[] = []
+  const markCut = (index: number) => {
+    cut = index
+    closersAtCut = [...closers]
+  }
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === '{' || char === '[') {
+      closers.push(char === '{' ? '}' : ']')
+      markCut(index + 1)
+    } else if (char === '}' || char === ']') {
+      closers.pop()
+      if (closers.length === 0) return text.slice(start, index + 1)
+      markCut(index + 1)
+    } else if (char === ',') markCut(index)
+  }
+  return cut === -1 ? null : text.slice(start, cut) + closersAtCut.reverse().join('')
+}
