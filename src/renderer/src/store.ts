@@ -1,18 +1,19 @@
 import { useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import type {
+  AgentEvent,
   ChatMessage,
   CodeLocation,
   ContextRef,
   DraftComment,
   EnvironmentStatus,
-  PrSession,
-  ProgressEvent,
   ProviderId,
+  PrSession,
   ReviewEvent,
   ReviewState,
   Settings,
   StopProgress,
+  Tour,
 } from '../../shared/types'
 import { dojo, errorMessage, startTask } from './api'
 import { EMPTY_PROGRESS, findStop, tourStops } from '../../shared/tour'
@@ -25,7 +26,12 @@ export interface RunningTask {
   id: string
   startedAt: number
   eventCount: number
-  events: ProgressEvent[]
+  /** Steps and narration, newest last. */
+  events: AgentEvent[]
+  /** The answer as written so far. */
+  draft: string | null
+  /** The readable part of a tour that is still being written. */
+  preview: Tour | null
 }
 
 export type PeekTarget = CodeLocation | ContextRef
@@ -427,12 +433,24 @@ async function runTask<T>(key: TaskKey, run: (taskId: string) => Promise<T>): Pr
     setState((state) => {
       const current = state.tasks[key]
       if (current?.id !== task.id) return {}
-      const events = [...current.events.slice(1 - MAX_TASK_EVENTS), event]
-      return { tasks: { ...state.tasks, [key]: { ...current, events, eventCount: current.eventCount + 1 } } }
+      const next: RunningTask =
+        event.kind === 'tour'
+          ? { ...current, preview: event.tour }
+          : event.kind === 'draft'
+            ? { ...current, draft: event.text }
+            : {
+                ...current,
+                events: [...current.events.slice(1 - MAX_TASK_EVENTS), { kind: event.kind, text: event.text }],
+                eventCount: current.eventCount + 1,
+              }
+      return { tasks: { ...state.tasks, [key]: next } }
     }),
   )
   setState((state) => ({
-    tasks: { ...state.tasks, [key]: { id: task.id, startedAt: Date.now(), eventCount: 0, events: [] } },
+    tasks: {
+      ...state.tasks,
+      [key]: { id: task.id, startedAt: Date.now(), eventCount: 0, events: [], draft: null, preview: null },
+    },
     errors: without(state.errors, key),
   }))
   try {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ProgressEvent } from '../../../shared/types'
+import type { AgentEvent } from '../../../shared/types'
 import { formatElapsed } from '../lib/format'
 import type { RunningTask } from '../store'
 import styles from './ActivityLog.module.css'
@@ -53,7 +53,7 @@ export function ActivityLog({ task, label, limit = 8, onCancel }: ActivityLogPro
   )
 }
 
-function firstLine(event: ProgressEvent): string {
+function firstLine(event: AgentEvent): string {
   return event.text.trim().split('\n', 1)[0]
 }
 

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { findStop } from '../shared/tour'
+import { findStop, tourStops } from '../shared/tour'
 import type {
   AgentEvent,
   ChatMessage,
@@ -18,6 +18,7 @@ import type {
   ReviewThread,
   Stack,
   Stop,
+  TaskEvent,
   TeamLessons,
   TourRecord,
 } from '../shared/types'
@@ -32,7 +33,7 @@ import { askPrompt, gradePrompt, polishPrompt, sessionSeedPrompt, tourPrompt, to
 import type { Provider } from './providers/provider'
 import { draftProblem, lineOnSide } from '../shared/review'
 import { Store } from './store'
-import { normalizeTour, rawTourSchema, tourJsonSchema } from './tour'
+import { normalizeTour, partialTour, rawTourSchema, tourJsonSchema } from './tour'
 
 interface Conversation {
   sessionId: string | null
@@ -54,7 +55,7 @@ interface OpenPr {
 
 export interface TaskContext {
   signal: AbortSignal
-  onEvent: (event: AgentEvent) => void
+  onEvent: (event: TaskEvent) => void
 }
 
 const refKey = (ref: PrRef) => `${ref.owner}/${ref.repo}#${ref.number}`
@@ -121,8 +122,9 @@ export class Dojo {
       cwd: session.worktree,
       schema: tourJsonSchema,
       tools: 'repo' as const,
-      streamDrafts: false,
-      ...task,
+      streamDrafts: true,
+      signal: task.signal,
+      onEvent: previewTour(session.diff, task.onEvent),
     }
     const context = { lessons, threads: session.threads, previous: session.previous }
     let result = await provider.run({
@@ -335,6 +337,19 @@ export class Dojo {
     const found = tour ? findStop(tour, stopId) : null
     if (!found) throw new Error(`Unknown stop ${stopId}.`)
     return found.stop
+  }
+}
+
+/** Turns streamed drafts of the tour JSON into previews, sent only when another stop becomes readable. */
+function previewTour(diff: Diff, onEvent: (event: TaskEvent) => void): (event: AgentEvent) => void {
+  let readableStops = -1
+  return (event) => {
+    if (event.kind !== 'draft') return onEvent(event)
+    const tour = partialTour(event.text, diff)
+    const stops = tour ? tourStops(tour).length : -1
+    if (!tour || stops <= readableStops) return
+    readableStops = stops
+    onEvent({ kind: 'tour', tour })
   }
 }
 

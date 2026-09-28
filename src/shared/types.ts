@@ -318,9 +318,10 @@ export interface AgentEvent {
   text: string
 }
 
-export interface ProgressEvent extends AgentEvent {
-  taskId: string
-}
+/** `tour` carries the readable part of a tour that is still being written. */
+export type TaskEvent = AgentEvent | { kind: 'tour'; tour: Tour }
+
+export type ProgressEvent = TaskEvent & { taskId: string }
 
 export interface DojoApi {
   environment(): Promise<EnvironmentStatus>

@@ -4,7 +4,8 @@ import { parseArgs } from 'node:util'
 import { Dojo } from './engine/dojo'
 import { apiKeyFromEnv, createProvider } from './engine/providers'
 import { DEFAULT_SETTINGS, PROVIDER_IDS } from './shared/providers'
-import type { AgentEvent, ProviderId } from './shared/types'
+import { tourStops } from './shared/tour'
+import type { ProviderId, TaskEvent } from './shared/types'
 
 const USAGE = `Usage: review-dojo tour <pr-url | owner/repo#number> [--provider claude|codex] [--model <id>]
 
@@ -38,7 +39,11 @@ async function main(): Promise<void> {
   process.once('SIGINT', () => controller.abort())
   const task = {
     signal: controller.signal,
-    onEvent: (event: AgentEvent) => log(event.kind === 'step' ? `  ${event.text}` : `  » ${event.text.split('\n')[0]}`),
+    onEvent: (event: TaskEvent) => {
+      if (event.kind === 'step') log(`  ${event.text}`)
+      else if (event.kind === 'text') log(`  » ${event.text.split('\n')[0]}`)
+      else if (event.kind === 'tour') log(`  ${tourStops(event.tour).length} stops written`)
+    },
   }
   const session = await dojo.openPullRequest(target, task)
   log(
