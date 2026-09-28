@@ -102,3 +102,24 @@
   color: var(--text-tertiary);
   font-size: var(--text-xs);
 }
+
+.updated {
+  flex: none;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.writing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}

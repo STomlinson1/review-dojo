@@ -71,3 +71,29 @@
     transform: translateY(3px);
   }
 }
+
+.log[data-quiet='true'] {
+  border: 0;
+  background: none;
+}
+
+.log[data-quiet='true'] .header {
+  min-height: 24px;
+  padding: 0;
+}
+
+.log[data-quiet='true'] .label {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+
+.log[data-quiet='true'] .events {
+  padding: 0 0 0 15px;
+  border: 0;
+  background: none;
+}
+
+.log[data-quiet='true'] .event {
+  color: var(--text-tertiary);
+}

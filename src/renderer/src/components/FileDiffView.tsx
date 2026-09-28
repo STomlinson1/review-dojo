@@ -1,16 +1,23 @@
 import type { DiffLineAnnotation, FileDiffOptions, SelectedLineRange } from '@pierre/diffs/react'
 import { PatchDiff } from '@pierre/diffs/react'
 import { memo, useCallback, useMemo, useState } from 'react'
-import { hunkContaining } from '../../../shared/review'
-import type { DiffFile, DraftComment, Hunk } from '../../../shared/types'
+import type { DiffFile, Hunk } from '../../../shared/types'
 import { dojo } from '../api'
-import { type CommentTarget, commentTarget, lineLabel, toAnnotationSide } from '../lib/comments'
+import {
+  type CommentTarget,
+  type DiffAnnotation,
+  askSelection,
+  commentTarget,
+  diffAnnotations,
+  lineLabel,
+  toAnnotationSide,
+} from '../lib/comments'
 import { synthesizePatch } from '../lib/patch'
-import { useDojo } from '../store'
+import { useDojo, usePreviewing } from '../store'
+import { Button } from './Button'
 import { CommentForm, DraftCard, SelectionError } from './Comments'
+import { ThreadCard } from './Discussion'
 import styles from './FileDiffView.module.css'
-
-type Annotation = { kind: 'draft'; draft: DraftComment } | { kind: 'composer' }
 
 interface Composer {
   range: SelectedLineRange
@@ -35,8 +42,11 @@ export const FileDiffView = memo(function FileDiffView({
 }: FileDiffViewProps) {
   const prRef = useDojo((state) => state.session?.pr.ref)
   const allDrafts = useDojo((state) => state.session?.review.drafts)
+  const allThreads = useDojo((state) => state.session?.threads)
+  const changedSinceReview = useDojo((state) => state.session?.review.previous?.changedPaths.includes(file.path))
   const diffStyle = useDojo((state) => state.diffStyle)
-  const { addDraft, showInFullDiff } = useDojo.getState()
+  const previewing = usePreviewing()
+  const { addDraft, askAbout, showInFullDiff } = useDojo.getState()
   const [dragRange, setDragRange] = useState<SelectedLineRange | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
 
@@ -66,7 +76,7 @@ export const FileDiffView = memo(function FileDiffView({
     }
   }, [prRef, file, showsWholeFile])
 
-  const options = useMemo<FileDiffOptions<Annotation, undefined>>(
+  const options = useMemo<FileDiffOptions<DiffAnnotation, undefined>>(
     () => ({
       diffStyle,
       themeType: 'system',
@@ -87,14 +97,7 @@ export const FileDiffView = memo(function FileDiffView({
   )
 
   const annotations = useMemo(() => {
-    const drafts = (allDrafts ?? []).filter(
-      (draft) => draft.path === file.path && hunkContaining(hunks, draft.side, draft.line) !== undefined,
-    )
-    const items: DiffLineAnnotation<Annotation>[] = drafts.map((draft) => ({
-      side: toAnnotationSide(draft.side),
-      lineNumber: draft.line,
-      metadata: { kind: 'draft', draft },
-    }))
+    const items = diffAnnotations(file.path, hunks, allThreads ?? [], allDrafts ?? [])
     if (composer) {
       const { range, target } = composer
       items.push(
@@ -104,19 +107,41 @@ export const FileDiffView = memo(function FileDiffView({
       )
     }
     return items
-  }, [allDrafts, file.path, hunks, composer])
+  }, [allDrafts, allThreads, file.path, hunks, composer])
 
-  const renderAnnotation = (annotation: DiffLineAnnotation<Annotation>) => {
-    if (annotation.metadata.kind === 'draft') return <DraftCard draft={annotation.metadata.draft} />
+  const renderAnnotation = ({ metadata }: DiffLineAnnotation<DiffAnnotation>) => {
+    if (metadata.kind === 'thread') return <ThreadCard thread={metadata.thread} />
+    if (metadata.kind === 'draft') return <DraftCard draft={metadata.draft} />
     if (!composer) return null
-    const { target } = composer
-    if ('error' in target) return <SelectionError message={target.error} onDismiss={() => setComposer(null)} />
+    const { range, target } = composer
+    const ask = (
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={previewing}
+        title={previewing ? 'Ask opens once the tour is finished.' : undefined}
+        onClick={() => {
+          askAbout(askSelection(range, file))
+          setComposer(null)
+        }}
+      >
+        Ask about these lines
+      </Button>
+    )
+    if ('error' in target) {
+      return (
+        <SelectionError message={target.error} onDismiss={() => setComposer(null)}>
+          {ask}
+        </SelectionError>
+      )
+    }
     return (
       <CommentForm
         key={`${target.side}:${target.startLine}:${target.line}`}
         label={lineLabel(target)}
         note={target.note}
         submitLabel="Add comment"
+        secondaryAction={ask}
         onCancel={() => setComposer(null)}
         onSubmit={(body) => {
           addDraft({ path: file.path, side: target.side, startLine: target.startLine, line: target.line, body, stopId })
@@ -136,7 +161,7 @@ export const FileDiffView = memo(function FileDiffView({
       renderAnnotation={renderAnnotation}
       renderHeaderFilenameSuffix={() => (
         <>
-          <FileNote file={file} shown={hunks.length} />
+          <FileNote file={file} shown={hunks.length} changedSinceReview={changedSinceReview ?? false} />
           {linkToFullDiff ? (
             <button type="button" className={styles.fullDiffLink} onClick={() => showInFullDiff(hunks[0].id)}>
               Show in full diff
@@ -154,10 +179,11 @@ function composerSelection({ range, target }: Composer): SelectedLineRange {
   return { start: target.startLine ?? target.line, end: target.line, side, endSide: side }
 }
 
-function FileNote({ file, shown }: { file: DiffFile; shown: number }) {
+function FileNote({ file, shown, changedSinceReview }: { file: DiffFile; shown: number; changedSinceReview: boolean }) {
   const parts = [
     file.status === 'modified' ? null : file.status,
     shown < file.hunks.length ? `${shown} of ${file.hunks.length} hunks here` : null,
+    changedSinceReview ? 'changed since your review' : null,
   ].filter((part) => part !== null)
   if (parts.length === 0) return null
   return <span className={styles.fileNote}>{parts.join(' · ')}</span>

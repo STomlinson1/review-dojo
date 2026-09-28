@@ -9,18 +9,20 @@ interface ActivityLogProps {
   task: RunningTask
   label: string
   limit?: number
+  /** Recedes behind an answer that is already streaming in. */
+  quiet?: boolean
   onCancel?(): void
 }
 
-export function ActivityLog({ task, label, limit = 8, onCancel }: ActivityLogProps) {
+export function ActivityLog({ task, label, limit = 8, quiet = false, onCancel }: ActivityLogProps) {
   const elapsed = useElapsed(task.startedAt)
-  const recent = task.events.slice(-limit)
+  const recent = task.events.slice(quiet ? -1 : -limit)
   const firstIndex = task.eventCount - recent.length
 
   return (
-    <div className={styles.log}>
+    <div className={styles.log} data-quiet={quiet}>
       <div className={styles.header}>
-        <span className={styles.pulse} aria-hidden="true" />
+        <Pulse />
         <span className={styles.label} role="status">
           {label}
         </span>
@@ -53,11 +55,15 @@ export function ActivityLog({ task, label, limit = 8, onCancel }: ActivityLogPro
   )
 }
 
+export function Pulse() {
+  return <span className={styles.pulse} aria-hidden="true" />
+}
+
 function firstLine(event: AgentEvent): string {
   return event.text.trim().split('\n', 1)[0]
 }
 
-function useElapsed(since: number): number {
+export function useElapsed(since: number): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000)

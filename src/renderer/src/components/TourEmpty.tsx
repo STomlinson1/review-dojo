@@ -3,6 +3,8 @@ import { useDojo, useSession } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
+import { Markdown } from './Markdown'
+import { OpenDiscussion } from './Discussion'
 import styles from './TourEmpty.module.css'
 
 export function TourEmpty() {
@@ -25,6 +27,13 @@ export function TourEmpty() {
           {provider} is reading the change and the code around it. Large pull requests can take several minutes.
         </p>
         <ActivityLog task={task} label="Exploring the repository" onCancel={() => cancelTask('tour')} />
+        {task.preview?.summary ? (
+          <section className={styles.summary} aria-label="Summary so far">
+            <p className={styles.summaryLabel}>Summary</p>
+            <Markdown>{task.preview.summary}</Markdown>
+            <p className={styles.meta}>The first stop appears here as soon as it's written.</p>
+          </section>
+        ) : null}
       </div>
     )
   }
@@ -65,6 +74,7 @@ export function TourEmpty() {
         </p>
       ) : null}
       {error ? <ErrorNote title="The tour couldn't be generated" message={error} /> : null}
+      <OpenDiscussion />
     </div>
   )
 }

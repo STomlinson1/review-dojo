@@ -51,6 +51,8 @@ export function CodePeek({ target, onClose }: { target: PeekTarget; onClose(): v
         const line = node.shadowRoot?.querySelector(`[data-line="${target.startLine}"]`)
         if (!line) return
         line.scrollIntoView({ block: 'center' })
+        // A line wider than the view also scrolls sideways, which would hide the line numbers.
+        for (let parent = line.parentElement; parent; parent = parent.parentElement) parent.scrollLeft = 0
         scrolled.current = true
       },
     }),

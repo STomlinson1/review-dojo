@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Hunk } from '../../../shared/types'
-import { commentTarget } from './comments'
+import type { DiffFile, DraftComment, Hunk, ReviewThread } from '../../../shared/types'
+import { askSelection, commentTarget, diffAnnotations } from './comments'
 
 const hunks: Hunk[] = [
   {
@@ -64,5 +64,85 @@ describe('commentTarget', () => {
 
   it('rejects lines outside every hunk, such as expanded context', () => {
     expect(commentTarget({ start: 20, end: 20, side: 'additions' }, hunks)).toHaveProperty('error')
+  })
+})
+
+const file: DiffFile = {
+  path: 'b.ts',
+  oldPath: 'a.ts',
+  status: 'renamed',
+  isBinary: false,
+  isGenerated: false,
+  additions: 2,
+  deletions: 1,
+  hunks,
+}
+
+const thread = (id: string, side: 'LEFT' | 'RIGHT', line: number | null, path = 'b.ts'): ReviewThread => ({
+  id,
+  path,
+  side,
+  line,
+  startLine: null,
+  isResolved: false,
+  isOutdated: line === null,
+  comments: [],
+})
+
+const draft = (id: string, line: number): DraftComment => ({
+  id,
+  path: 'b.ts',
+  side: 'RIGHT',
+  startLine: null,
+  line,
+  body: '',
+  stopId: null,
+  createdAt: '',
+})
+
+describe('diffAnnotations', () => {
+  it('places threads and drafts on their side and line, threads first', () => {
+    const annotations = diffAnnotations(
+      'b.ts',
+      hunks,
+      [thread('T1', 'RIGHT', 41), thread('T2', 'LEFT', 11)],
+      [draft('D1', 41)],
+    )
+    expect(annotations.map(({ side, lineNumber, metadata }) => [metadata.kind, side, lineNumber])).toEqual([
+      ['thread', 'additions', 41],
+      ['thread', 'deletions', 11],
+      ['draft', 'additions', 41],
+    ])
+  })
+
+  it('leaves out outdated threads, other files and lines this view does not render', () => {
+    const threads = [thread('T1', 'RIGHT', null), thread('T2', 'RIGHT', 41, 'c.ts'), thread('T3', 'RIGHT', 41)]
+    expect(diffAnnotations('b.ts', hunks.slice(0, 1), threads, [draft('D1', 41), draft('D2', 12)])).toEqual([
+      expect.objectContaining({ lineNumber: 12, metadata: expect.objectContaining({ kind: 'draft' }) }),
+    ])
+  })
+})
+
+describe('askSelection', () => {
+  it('reads an old-side selection from the old path', () => {
+    expect(askSelection({ start: 12, end: 10, side: 'deletions' }, file)).toEqual({
+      path: 'a.ts',
+      side: 'LEFT',
+      startLine: 10,
+      endLine: 12,
+    })
+  })
+
+  it('keeps expanded unchanged lines that a comment could not target', () => {
+    expect(askSelection({ start: 20, end: 25, side: 'additions' }, file)).toMatchObject({ startLine: 20, endLine: 25 })
+  })
+
+  it('reads a selection across both sides on the new side', () => {
+    expect(askSelection({ start: 11, side: 'deletions', end: 42, endSide: 'additions' }, file)).toEqual({
+      path: 'b.ts',
+      side: 'RIGHT',
+      startLine: 11,
+      endLine: 42,
+    })
   })
 })

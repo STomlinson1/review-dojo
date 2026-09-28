@@ -1,21 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { tourToMarkdown } from '../../../shared/guide'
 import { PROVIDER_NAMES } from '../../../shared/providers'
-import type { DiffFile, IntentCheck, Stop } from '../../../shared/types'
-import { formatUsage } from '../lib/format'
+import type { DiffFile, IntentCheck, PreviousReview, Stop, TeamLessons, Tour } from '../../../shared/types'
+import { dojo, errorMessage } from '../api'
+import { formatUsage, relativeTime } from '../lib/format'
+import { changedPathsByStop } from '../lib/locate'
 import { findHunk, stopForHunk, tourStops } from '../../../shared/tour'
-import { useDojo, useSession } from '../store'
+import { useDojo, usePreviewing, useSession, useTour } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
+import { OpenDiscussion } from './Discussion'
 import { ErrorNote } from './ErrorNote'
-import { CheckIcon } from './icons'
+import { CheckIcon, ExternalIcon } from './icons'
 import { InlineCode, Markdown } from './Markdown'
 import styles from './Overview.module.css'
 import { RiskBadge } from './Risk'
 
 export function Overview() {
-  const { pr, diff, tour } = useSession()
+  const { pr, diff, review, lessons, tour: record } = useSession()
+  const tour = useTour()
+  const previewing = usePreviewing()
   if (!tour) return null
-  const stops = tourStops(tour.tour)
+  const stops = tourStops(tour)
 
   return (
     <article className={styles.page}>
@@ -37,27 +43,222 @@ export function Overview() {
             </div>
             <div>
               <dt>Stops</dt>
-              <dd>{stops.length}</dd>
+              <dd>{previewing ? `${stops.length} so far` : stops.length}</dd>
             </div>
             <div>
               <dt>Guide</dt>
               <dd>
-                {PROVIDER_NAMES[tour.provider]} · {tour.model}
-                {tour.usage ? ` · ${formatUsage(tour.usage)}` : ''}
+                {previewing || !record
+                  ? 'Writing…'
+                  : `${PROVIDER_NAMES[record.provider]} · ${record.model}${record.usage ? ` · ${formatUsage(record.usage)}` : ''}`}
               </dd>
             </div>
           </dl>
-          <Regenerate />
+          {previewing ? null : (
+            <div className={styles.actions}>
+              <CopyGuide tour={tour} />
+              <Regenerate />
+            </div>
+          )}
         </div>
       </header>
 
-      <RegenerationStatus />
-      <Markdown>{tour.tour.summary}</Markdown>
+      {previewing ? null : <RegenerationStatus />}
+      {review.previous ? <ChangesSinceReview previous={review.previous} tour={tour} /> : null}
+      <Markdown>{tour.summary}</Markdown>
       <UntouredFiles files={diff.files.filter((file) => file.hunks.length === 0)} />
-      <IntentSection intent={tour.tour.intent} />
+      <IntentSection intent={tour.intent} />
+      <OpenDiscussion />
       <RiskMap stops={stops} />
+      <LessonsSection lessons={lessons} />
     </article>
   )
+}
+
+const COPIED_NOTICE_MS = 2000
+
+type CopyState = { status: 'idle' } | { status: 'copied' } | { status: 'failed'; message: string }
+
+function CopyGuide({ tour }: { tour: Tour }) {
+  const { pr, diff } = useSession()
+  const [copy, setCopy] = useState<CopyState>({ status: 'idle' })
+
+  useEffect(() => {
+    if (copy.status !== 'copied') return
+    const timer = setTimeout(() => setCopy({ status: 'idle' }), COPIED_NOTICE_MS)
+    return () => clearTimeout(timer)
+  }, [copy])
+
+  const run = () =>
+    navigator.clipboard.writeText(tourToMarkdown(pr, tour, diff)).then(
+      () => setCopy({ status: 'copied' }),
+      (error: unknown) => setCopy({ status: 'failed', message: errorMessage(error) }),
+    )
+
+  return (
+    <>
+      {copy.status === 'failed' ? (
+        <span className={styles.copyFailed} role="alert">
+          Couldn't copy: {copy.message}
+        </span>
+      ) : null}
+      <Button
+        size="sm"
+        variant="ghost"
+        aria-live="polite"
+        title="Copy the tour as Markdown, for example to share in the pull request"
+        onClick={() => void run()}
+      >
+        {copy.status === 'copied' ? (
+          <>
+            <CheckIcon />
+            Copied
+          </>
+        ) : (
+          "Copy reviewer's guide"
+        )}
+      </Button>
+    </>
+  )
+}
+
+function ChangesSinceReview({ previous, tour }: { previous: PreviousReview; tour: Tour }) {
+  const { diff } = useSession()
+  const { select } = useDojo.getState()
+  const byStop = useMemo(() => changedPathsByStop(tour, diff, previous.changedPaths), [tour, diff, previous])
+  const count = previous.changedPaths.length
+  const firstStop = (path: string) => [...byStop].find(([, paths]) => paths.includes(path))?.[0]
+  const inDiff = new Set(diff.files.map((file) => file.path))
+
+  return (
+    <section className={styles.changes} aria-labelledby="changes-heading">
+      <h2 id="changes-heading" className={styles.changesTitle}>
+        You reviewed an earlier version ({previous.headSha.slice(0, 7)}).{' '}
+        {count === 0 ? 'No file changed since.' : `${count} ${count === 1 ? 'file' : 'files'} changed since.`}
+      </h2>
+      {count > 0 ? (
+        <ul className={styles.changedList}>
+          {previous.changedPaths.map((path) => {
+            const stopId = firstStop(path)
+            return (
+              <li key={path}>
+                {stopId ? (
+                  <button type="button" className={styles.changedPath} onClick={() => select(stopId)}>
+                    {path}
+                  </button>
+                ) : (
+                  <span className={styles.changedPlain}>
+                    <code>{path}</code>
+                    {inDiff.has(path) ? null : ' (no longer in the pull request)'}
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+    </section>
+  )
+}
+
+function LessonsSection({ lessons }: { lessons: TeamLessons | null }) {
+  const task = useDojo((state) => state.tasks.lessons)
+  const error = useDojo((state) => state.errors.lessons)
+  const { refreshLessons, cancelTask, dismissError } = useDojo.getState()
+  const count = lessons?.lessons.length ?? 0
+
+  const status = (
+    <>
+      {task ? (
+        <ActivityLog task={task} label="Learning from past reviews" limit={3} onCancel={() => cancelTask('lessons')} />
+      ) : null}
+      {error ? (
+        <ErrorNote title="Couldn't refresh the team's review lessons" message={error}>
+          <Button size="sm" onClick={() => dismissError('lessons')}>
+            Dismiss
+          </Button>
+        </ErrorNote>
+      ) : null}
+    </>
+  )
+  const refresh = (
+    <Button size="sm" variant="ghost" disabled={task !== undefined} onClick={() => void refreshLessons()}>
+      {lessons ? 'Refresh' : 'Learn now'}
+    </Button>
+  )
+
+  if (!lessons || count === 0) {
+    return (
+      <section className={styles.section} aria-labelledby="lessons-heading">
+        <h2 id="lessons-heading" className={styles.sectionTitle}>
+          Team review lessons
+        </h2>
+        <p className={styles.lessonsEmpty}>
+          <span className={styles.muted}>
+            {lessons
+              ? `No recurring expectations stood out in ${lessons.sourceCount} past review comments.`
+              : "Lessons come from this repository's past review comments and are learned when a tour is generated."}
+          </span>
+          {refresh}
+        </p>
+        {status}
+      </section>
+    )
+  }
+
+  return (
+    <details className={styles.lessons}>
+      <summary className={styles.sectionTitle}>
+        Team review lessons <span className={styles.lessonCount}>{count}</span>
+      </summary>
+      <div className={styles.lessonsBody}>
+        <p className={styles.lessonsMeta}>
+          <span>
+            Learned from {lessons.sourceCount} review comments · {relativeTime(lessons.generatedAt)}
+          </span>
+          {refresh}
+        </p>
+        {status}
+        <ol className={styles.lessonList}>
+          {lessons.lessons.map((lesson, index) => (
+            <li key={index} className={styles.lesson}>
+              <p className={styles.lessonTitle}>{lesson.title}</p>
+              <Markdown>{lesson.detail}</Markdown>
+              {lesson.examples.length > 0 ? (
+                <p className={styles.examples}>
+                  Seen in{' '}
+                  {exampleLabels(lesson.examples).map(({ url, label }) => (
+                    <button
+                      key={url}
+                      type="button"
+                      className={styles.example}
+                      title={url}
+                      onClick={() => void dojo.openExternal(url)}
+                    >
+                      {label}
+                      <ExternalIcon />
+                    </button>
+                  ))}
+                </p>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </details>
+  )
+}
+
+/** Several examples often come from one pull request, so repeats are numbered to tell the links apart. */
+function exampleLabels(urls: string[]): { url: string; label: string }[] {
+  const seen = new Map<string, number>()
+  return urls.map((url) => {
+    const pull = /\/pull\/(\d+)/.exec(url)?.[1]
+    const base = pull ? `#${pull}` : 'comment'
+    const count = (seen.get(base) ?? 0) + 1
+    seen.set(base, count)
+    return { url, label: count === 1 ? base : `${base} (${count})` }
+  })
 }
 
 function UntouredFiles({ files }: { files: DiffFile[] }) {
@@ -92,7 +293,7 @@ function Regenerate() {
   }
   return (
     <span className={styles.confirm}>
-      Replace this tour?
+      Replace this tour and reset your progress on it?
       <Button
         size="sm"
         variant="primary"
@@ -203,10 +404,11 @@ function IntentSection({ intent }: { intent: IntentCheck }) {
 }
 
 function HunkChip({ hunkId }: { hunkId: string }) {
-  const { diff, tour } = useSession()
+  const { diff } = useSession()
+  const tour = useTour()
   const { select } = useDojo.getState()
   const hunk = findHunk(diff, hunkId)
-  const stop = tour ? stopForHunk(tour.tour, hunkId) : undefined
+  const stop = tour ? stopForHunk(tour, hunkId) : undefined
   const label = hunk ? `${hunk.path.slice(hunk.path.lastIndexOf('/') + 1)}:${hunk.newStart}` : hunkId
 
   return (

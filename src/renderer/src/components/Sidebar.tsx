@@ -1,14 +1,24 @@
-import { useDojo, useSession } from '../store'
+import { useMemo } from 'react'
+import { changedPathsByStop } from '../lib/locate'
+import { useDojo, usePreviewing, useSession, useTour } from '../store'
+import { Pulse } from './ActivityLog'
 import { CheckIcon } from './icons'
 import { RiskDot } from './Risk'
 import { InlineCode } from './Markdown'
 import styles from './Sidebar.module.css'
 
 export function Sidebar() {
-  const { tour, review } = useSession()
+  const { diff, review } = useSession()
+  const tour = useTour()
+  const previewing = usePreviewing()
   const selectedStopId = useDojo((state) => state.selectedStopId)
   const spiedStopId = useDojo((state) => state.spiedStopId)
   const { select } = useDojo.getState()
+  const changedPaths = review.previous?.changedPaths
+  const updated = useMemo(
+    () => (tour && changedPaths ? changedPathsByStop(tour, diff, changedPaths) : null),
+    [tour, diff, changedPaths],
+  )
   if (!tour) return null
 
   return (
@@ -21,7 +31,7 @@ export function Sidebar() {
       >
         Overview
       </button>
-      {tour.tour.chapters.map((chapter) => (
+      {tour.chapters.map((chapter) => (
         <section key={chapter.id} className={styles.chapter} aria-label={chapter.title}>
           <h3 className={styles.chapterTitle} title={chapter.goal}>
             <InlineCode>{chapter.title}</InlineCode>
@@ -32,6 +42,7 @@ export function Sidebar() {
           <ol className={styles.stops}>
             {chapter.stops.map((stop) => {
               const understood = review.stops[stop.id]?.understood ?? false
+              const updatedPaths = updated?.get(stop.id)
               return (
                 <li key={stop.id}>
                   <button
@@ -47,6 +58,11 @@ export function Sidebar() {
                     <span className={styles.stopTitle}>
                       <InlineCode>{stop.title}</InlineCode>
                     </span>
+                    {updatedPaths ? (
+                      <span className={styles.updated} title={`Changed since your review: ${updatedPaths.join(', ')}`}>
+                        updated
+                      </span>
+                    ) : null}
                     {understood ? (
                       <span className={styles.understood} role="img" aria-label="Understood">
                         <CheckIcon />
@@ -59,6 +75,12 @@ export function Sidebar() {
           </ol>
         </section>
       ))}
+      {previewing ? (
+        <p className={styles.writing}>
+          <Pulse />
+          Writing…
+        </p>
+      ) : null}
       <p className={styles.keys}>
         <span>
           <kbd>j</kbd> <kbd>k</kbd> move

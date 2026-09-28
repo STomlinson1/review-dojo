@@ -4,7 +4,7 @@ import type { DraftComment, ReviewEvent } from '../../../shared/types'
 import { dojo, errorMessage } from '../api'
 import { lineLabel } from '../lib/comments'
 import { tourStops } from '../../../shared/tour'
-import { useDojo, useSession } from '../store'
+import { useDojo, useSession, useTour } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
@@ -24,14 +24,15 @@ type Submission =
   { status: 'idle' } | { status: 'confirming' } | { status: 'submitting' } | { status: 'failed'; message: string }
 
 export function SubmitPanel({ onClose }: { onClose(): void }) {
-  const { diff, tour, review } = useSession()
+  const { diff, review } = useSession()
+  const tour = useTour()
   const { setReviewBody, submitReview, select } = useDojo.getState()
   const [event, setEvent] = useState<ReviewEvent>('PENDING')
   const [submission, setSubmission] = useState<Submission>({ status: 'idle' })
 
   const problems = new Map(review.drafts.map((draft) => [draft.id, draftProblem(draft, diff)]))
   const blocked = [...problems.values()].some((problem) => problem !== null)
-  const unread = tour ? tourStops(tour.tour).filter((stop) => !review.stops[stop.id]?.understood) : []
+  const unread = tour ? tourStops(tour).filter((stop) => !review.stops[stop.id]?.understood) : []
   const byFile = Map.groupBy(review.drafts, (draft) => draft.path)
   const eventLabel = EVENTS.find((option) => option.value === event)?.label ?? event
 

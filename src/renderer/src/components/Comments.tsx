@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { DraftComment } from '../../../shared/types'
 import { lineLabel } from '../lib/comments'
 import { useDojo } from '../store'
@@ -11,11 +11,20 @@ interface CommentFormProps {
   note?: string | null
   initialBody?: string
   submitLabel: string
+  secondaryAction?: ReactNode
   onSubmit(body: string): void
   onCancel(): void
 }
 
-export function CommentForm({ label, note, initialBody = '', submitLabel, onSubmit, onCancel }: CommentFormProps) {
+export function CommentForm({
+  label,
+  note,
+  initialBody = '',
+  submitLabel,
+  secondaryAction,
+  onSubmit,
+  onCancel,
+}: CommentFormProps) {
   const [body, setBody] = useState(initialBody)
   const submit = () => {
     if (body.trim()) onSubmit(body.trim())
@@ -52,6 +61,7 @@ export function CommentForm({ label, note, initialBody = '', submitLabel, onSubm
         <span className={styles.hint}>
           <kbd>⌘</kbd> <kbd>↵</kbd> to save
         </span>
+        {secondaryAction}
         <Button size="sm" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
@@ -99,11 +109,18 @@ export function DraftCard({ draft }: { draft: DraftComment }) {
   )
 }
 
-export function SelectionError({ message, onDismiss }: { message: string; onDismiss(): void }) {
+interface SelectionErrorProps {
+  message: string
+  children?: ReactNode
+  onDismiss(): void
+}
+
+export function SelectionError({ message, children, onDismiss }: SelectionErrorProps) {
   return (
     <div className={styles.card} role="alert">
       <div className={styles.header}>
         <span className={styles.error}>{message}</span>
+        {children}
         <Button size="sm" variant="ghost" onClick={onDismiss}>
           Dismiss
         </Button>

@@ -4,6 +4,7 @@ import type {
   AgentEvent,
   ChatMessage,
   CodeLocation,
+  CodeSelection,
   ContextRef,
   DraftComment,
   EnvironmentStatus,
@@ -20,7 +21,7 @@ import { EMPTY_PROGRESS, findStop, tourStops } from '../../shared/tour'
 import { firstHunkInDiff } from './lib/fullDiff'
 import { type Layout, initialLayout, rememberLayout, sideBySideFits } from './lib/layout'
 
-export type TaskKey = 'open' | 'tour' | 'ask' | `grade:${string}` | `polish:${string}`
+export type TaskKey = 'open' | 'tour' | 'ask' | 'lessons' | `grade:${string}` | `polish:${string}`
 
 export interface RunningTask {
   id: string
@@ -62,6 +63,7 @@ interface DojoState {
   spiedStopId: string | null
   askOpen: boolean
   askFocusRequest: number
+  askSelection: CodeSelection | null
   overlay: Overlay
   tasks: Partial<Record<TaskKey, RunningTask>>
   errors: Partial<Record<TaskKey, string>>
@@ -89,6 +91,7 @@ interface DojoActions {
   setSpiedStopId(stopId: string | null): void
   setAskOpen(open: boolean): void
   focusAsk(): void
+  askAbout(selection: CodeSelection | null): void
   setOverlay(overlay: Overlay): void
   updateStop(stopId: string, patch: Partial<StopProgress>): void
   addDraft(draft: Omit<DraftComment, 'id' | 'createdAt'>): void
@@ -96,6 +99,7 @@ interface DojoActions {
   deleteDraft(id: string): void
   setReviewBody(body: string): void
   ask(question: string): Promise<void>
+  refreshLessons(): Promise<void>
   gradePrediction(stopId: string): Promise<void>
   polishDraft(draftId: string): Promise<void>
   resolvePolish(draftId: string, accept: boolean): void
@@ -127,6 +131,7 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   spiedStopId: null,
   askOpen: true,
   askFocusRequest: 0,
+  askSelection: null,
   overlay: null,
   tasks: {},
   errors: {},
@@ -175,6 +180,7 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
       diffFocus: null,
       spiedStopId: null,
       dojoMode: state.settings?.dojoMode ?? state.dojoMode,
+      askSelection: null,
       overlay: null,
       errors: {},
       saveError: null,
@@ -190,6 +196,7 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
       selectedStopId: null,
       diffFocus: null,
       spiedStopId: null,
+      askSelection: null,
       overlay: null,
       errors: {},
       polishSuggestions: {},
@@ -200,11 +207,9 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
     const { session, tasks } = get()
     if (!session || tasks.tour) return
     cancelSessionTasks()
-    const record = await runTask('tour', (taskId) => dojo.generateTour(session.pr.ref, taskId))
-    if (!record) return
-    if (get().session?.pr.url !== session.pr.url) return
-    set((state) => ({ session: state.session && { ...state.session, tour: record }, selectedStopId: null }))
+    set({ selectedStopId: null, spiedStopId: null })
     // Stop ids restart with every tour, so progress keyed by them would attach to the wrong stops.
+    // Previews already use the new tour's ids, so the reset happens before the first one arrives.
     updateReview((review) => ({
       ...review,
       visitedStopIds: [],
@@ -212,6 +217,9 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
       chat: review.chat.map((message) => ({ ...message, stopId: null })),
       drafts: review.drafts.map((draft) => ({ ...draft, stopId: null })),
     }))
+    const record = await runTask('tour', (taskId) => dojo.generateTour(session.pr.ref, taskId))
+    if (!record) return
+    set((state) => (state.session?.pr.url === session.pr.url ? { session: { ...state.session, tour: record } } : {}))
   },
 
   cancelTask(key) {
@@ -230,7 +238,8 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
 
   select(stopId) {
     const session = get().session
-    const stop = stopId && session?.tour ? findStop(session.tour.tour, stopId)?.stop : undefined
+    const tour = currentTour(get())
+    const stop = stopId && tour ? findStop(tour, stopId)?.stop : undefined
     const hunkId = stop && session ? firstHunkInDiff(session.diff, stop.hunkIds) : null
     set((state) => ({
       selectedStopId: stopId,
@@ -245,9 +254,10 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   },
 
   step(delta) {
-    const { session, selectedStopId, select } = get()
-    if (!session?.tour) return
-    const order = [null, ...tourStops(session.tour.tour).map((stop) => stop.id)]
+    const { selectedStopId, select } = get()
+    const tour = currentTour(get())
+    if (!tour) return
+    const order = [null, ...tourStops(tour).map((stop) => stop.id)]
     const next = order[order.indexOf(selectedStopId) + delta]
     if (next !== undefined) select(next)
   },
@@ -286,6 +296,11 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
     set((state) => ({ askOpen: true, narrationTab: 'ask', askFocusRequest: state.askFocusRequest + 1 }))
   },
 
+  askAbout(selection) {
+    set({ askSelection: selection })
+    if (selection) get().focusAsk()
+  },
+
   setOverlay(overlay) {
     set({ overlay })
   },
@@ -316,24 +331,37 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   },
 
   async ask(question) {
-    const { session, selectedStopId, tasks } = get()
-    if (!session || tasks.ask) return
+    const { session, selectedStopId, tasks, askSelection } = get()
+    if (!session || tasks.ask || tourPreview(get())) return
+    const selection = askSelection ?? undefined
     const asked: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       text: question,
       stopId: selectedStopId,
+      selection,
       createdAt: new Date().toISOString(),
     }
+    set({ askSelection: null })
     updateReview((review) => ({ ...review, chat: [...review.chat, asked] }))
-    const answer = await runTask('ask', (taskId) => dojo.ask(session.pr.ref, selectedStopId, question, taskId))
+    const answer = await runTask('ask', (taskId) =>
+      dojo.ask(session.pr.ref, selectedStopId, question, taskId, selection),
+    )
     if (answer) updateReview((review) => ({ ...review, chat: [...review.chat, answer] }), session.pr.url)
+  },
+
+  async refreshLessons() {
+    const { session, tasks } = get()
+    if (!session || tasks.lessons) return
+    const lessons = await runTask('lessons', (taskId) => dojo.refreshLessons(session.pr.ref, taskId))
+    if (!lessons) return
+    set((state) => (state.session?.pr.url === session.pr.url ? { session: { ...state.session, lessons } } : {}))
   },
 
   async gradePrediction(stopId) {
     const { session } = get()
     const prediction = session?.review.stops[stopId]?.prediction.trim()
-    if (!session || !prediction) return
+    if (!session || !prediction || tourPreview(get())) return
     const feedback = await runTask(`grade:${stopId}`, (taskId) =>
       dojo.gradePrediction(session.pr.ref, stopId, prediction, taskId),
     )
@@ -371,6 +399,24 @@ export function useSession(): PrSession {
   const session = useDojo((state) => state.session)
   if (!session) throw new Error('No pull request is open.')
   return session
+}
+
+/** The part of a tour still being written, once it has a stop to read. */
+export function tourPreview(state: DojoState): Tour | null {
+  const preview = state.tasks.tour?.preview
+  return preview && tourStops(preview).length > 0 ? preview : null
+}
+
+export function currentTour(state: DojoState): Tour | null {
+  return tourPreview(state) ?? state.session?.tour?.tour ?? null
+}
+
+export function useTour(): Tour | null {
+  return useDojo(currentTour)
+}
+
+export function usePreviewing(): boolean {
+  return useDojo((state) => tourPreview(state) !== null)
 }
 
 export function isSideBySide(layout: Layout): boolean {

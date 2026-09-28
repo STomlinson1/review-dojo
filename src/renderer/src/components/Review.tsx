@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
+import { tourStops } from '../../../shared/tour'
+import { formatElapsed } from '../lib/format'
 import { sideBySideFits } from '../lib/layout'
-import { isSideBySide, useDojo, useSideBySide } from '../store'
+import { currentTour, isSideBySide, tourPreview, useDojo, useSideBySide } from '../store'
+import { Pulse, useElapsed } from './ActivityLog'
 import { AskPanel } from './AskPanel'
 import { Button } from './Button'
 import { FullDiff } from './FullDiff'
@@ -12,7 +15,7 @@ import { TopBar } from './TopBar'
 import { TourEmpty } from './TourEmpty'
 
 export function Review() {
-  const hasTour = useDojo((state) => state.session?.tour != null)
+  const hasTour = useDojo((state) => currentTour(state) !== null)
   const askOpen = useDojo((state) => state.askOpen)
   const sideBySide = useSideBySide().active
 
@@ -22,6 +25,7 @@ export function Review() {
     <div className={styles.review}>
       <TopBar />
       <StatusBanner />
+      <PreviewStatus />
       <div className={styles.body} data-layout={sideBySide ? 'side-by-side' : 'focus'}>
         {hasTour ? <Sidebar /> : null}
         {sideBySide ? (
@@ -41,7 +45,7 @@ export function Review() {
 }
 
 function Narration() {
-  const hasTour = useDojo((state) => state.session?.tour != null)
+  const hasTour = useDojo((state) => currentTour(state) !== null)
   const tab = useDojo((state) => state.narrationTab)
   const selectedStopId = useDojo((state) => state.selectedStopId)
   const { setNarrationTab } = useDojo.getState()
@@ -65,7 +69,7 @@ function Narration() {
 }
 
 function Guide({ showDiffs }: { showDiffs: boolean }) {
-  const hasTour = useDojo((state) => state.session?.tour != null)
+  const hasTour = useDojo((state) => currentTour(state) !== null)
   const selectedStopId = useDojo((state) => state.selectedStopId)
   const ref = useRef<HTMLElement>(null)
 
@@ -125,6 +129,33 @@ function StatusBanner() {
   return null
 }
 
+function PreviewStatus() {
+  const stops = useDojo((state) => {
+    const preview = tourPreview(state)
+    return preview ? tourStops(preview).length : 0
+  })
+  const startedAt = useDojo((state) => state.tasks.tour?.startedAt)
+  const { cancelTask } = useDojo.getState()
+  if (stops === 0 || startedAt === undefined) return null
+
+  return (
+    <div className={styles.banner} role="status">
+      <Pulse />
+      <span className={styles.bannerText}>
+        Still writing the tour: {stops} {stops === 1 ? 'stop' : 'stops'} so far
+      </span>
+      <Elapsed since={startedAt} />
+      <Button size="sm" variant="ghost" onClick={() => cancelTask('tour')}>
+        Cancel
+      </Button>
+    </div>
+  )
+}
+
+function Elapsed({ since }: { since: number }) {
+  return <span className={styles.bannerMeta}>{formatElapsed(useElapsed(since))}</span>
+}
+
 function useShortcuts() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -138,7 +169,7 @@ function useShortcuts() {
         event.preventDefault()
         return
       }
-      if (!state.session?.tour) return
+      if (!state.session || !currentTour(state)) return
       if (event.key === 'j') state.step(1)
       else if (event.key === 'k') state.step(-1)
       else if (event.key === 'u' && stopId) {

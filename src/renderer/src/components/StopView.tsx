@@ -8,7 +8,7 @@ import type {
 } from '../../../shared/types'
 import { formatLocation } from '../lib/codeRefs'
 import { EMPTY_PROGRESS, findStop, selectHunks, tourStops } from '../../../shared/tour'
-import { useDojo, useSession, useSideBySide } from '../store'
+import { useDojo, usePreviewing, useSession, useSideBySide, useTour } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
@@ -18,10 +18,11 @@ import { RiskBadge } from './Risk'
 import styles from './StopView.module.css'
 
 export function StopView({ stopId, showDiffs }: { stopId: string; showDiffs: boolean }) {
-  const { diff, tour, review } = useSession()
+  const { diff, review } = useSession()
+  const tour = useTour()
   const dojoMode = useDojo((state) => state.dojoMode)
   const { fits: canShowFullDiff } = useSideBySide()
-  const found = tour ? findStop(tour.tour, stopId) : null
+  const found = tour ? findStop(tour, stopId) : null
   const hunkIds = found?.stop.hunkIds
   const files = useMemo(() => {
     const wanted = new Set(hunkIds)
@@ -98,9 +99,11 @@ function DojoCard({
   const taskKey = `grade:${stopId}` as const
   const grading = useDojo((state) => state.tasks[taskKey])
   const gradeError = useDojo((state) => state.errors[taskKey])
+  const previewing = usePreviewing()
   const { updateStop, gradePrediction, cancelTask } = useDojo.getState()
   const hasPrediction = progress.prediction.trim().length > 0
   const predictionId = `prediction-${stopId}`
+  const feedback = grading?.draft ?? progress.predictionFeedback
 
   if (!progress.revealed) {
     return (
@@ -141,19 +144,26 @@ function DojoCard({
         <p className={styles.fieldLabel}>Answer</p>
         <Markdown>{question.answer}</Markdown>
       </div>
-      {progress.predictionFeedback ? (
+      {feedback ? (
         <div className={styles.feedback}>
           <p className={styles.fieldLabel}>Feedback on your read</p>
-          <Markdown>{progress.predictionFeedback}</Markdown>
+          <Markdown>{feedback}</Markdown>
         </div>
       ) : null}
       {grading ? (
-        <ActivityLog task={grading} label="Grading your read" limit={3} onCancel={() => cancelTask(taskKey)} />
+        <ActivityLog
+          task={grading}
+          label="Grading your read"
+          limit={3}
+          quiet={grading.draft !== null}
+          onCancel={() => cancelTask(taskKey)}
+        />
       ) : hasPrediction ? (
         <div className={styles.dojoActions}>
-          <Button onClick={() => void gradePrediction(stopId)}>
+          <Button disabled={previewing} onClick={() => void gradePrediction(stopId)}>
             {progress.predictionFeedback ? 'Grade again' : 'Grade my read'}
           </Button>
+          {previewing ? <span className={styles.hint}>Grading opens once the tour is finished.</span> : null}
         </div>
       ) : null}
       {gradeError ? <ErrorNote title="Couldn't grade your read" message={gradeError} /> : null}
@@ -269,11 +279,13 @@ function LocationLink({ location }: { location: CodeLocation | ContextRef }) {
 }
 
 function StopFooter({ stopId, understood }: { stopId: string; understood: boolean }) {
-  const { tour } = useSession()
+  const tour = useTour()
+  const previewing = usePreviewing()
   const { step, updateStop, setOverlay } = useDojo.getState()
-  const stops = tour ? tourStops(tour.tour) : []
+  const stops = tour ? tourStops(tour) : []
   const index = stops.findIndex((stop) => stop.id === stopId)
   const isLast = index === stops.length - 1
+  const awaitingNext = isLast && previewing
 
   return (
     <footer className={styles.footer}>
@@ -281,6 +293,7 @@ function StopFooter({ stopId, understood }: { stopId: string; understood: boolea
         {index === 0 ? '← Overview' : '← Previous'}
       </Button>
       <div className={styles.footerActions}>
+        {awaitingNext ? <span className={styles.hint}>The next stop is still being written.</span> : null}
         <label className={styles.understood}>
           <input
             type="checkbox"
@@ -289,16 +302,18 @@ function StopFooter({ stopId, understood }: { stopId: string; understood: boolea
           />
           Understood
         </label>
-        <Button
-          variant="primary"
-          onClick={() => {
-            updateStop(stopId, { understood: true })
-            if (isLast) setOverlay({ kind: 'submit' })
-            else step(1)
-          }}
-        >
-          {isLast ? 'Mark understood & review' : 'Mark understood & next'}
-        </Button>
+        {awaitingNext ? null : (
+          <Button
+            variant="primary"
+            onClick={() => {
+              updateStop(stopId, { understood: true })
+              if (isLast) setOverlay({ kind: 'submit' })
+              else step(1)
+            }}
+          >
+            {isLast ? 'Mark understood & review' : 'Mark understood & next'}
+          </Button>
+        )}
         {isLast ? null : (
           <Button variant="ghost" onClick={() => step(1)}>
             Next →

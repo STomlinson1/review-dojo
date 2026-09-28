@@ -77,6 +77,11 @@
   background: var(--risk-high-soft);
 }
 
+.bannerMeta {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .bannerText {
   flex: 1;
   min-width: 0;

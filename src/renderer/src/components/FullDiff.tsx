@@ -1,7 +1,7 @@
 import { type CSSProperties, createContext, memo, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { DiffFile, Hunk } from '../../../shared/types'
 import { type Segment, fileSegments, lastStartingAtOrAbove, unchangedLinesBefore } from '../lib/fullDiff'
-import { useDojo, useSession } from '../store'
+import { useDojo, useSession, useTour } from '../store'
 import { Button } from './Button'
 import { FileDiffView } from './FileDiffView'
 import styles from './FullDiff.module.css'
@@ -20,20 +20,40 @@ const FILE_HEADER_HEIGHT = 36
 const READING_OFFSET = FILE_HEADER_HEIGHT + 12
 
 export function FullDiff() {
-  const { diff, tour } = useSession()
+  const { diff, review } = useSession()
+  const tour = useTour()
   const selectedStopId = useDojo((state) => state.selectedStopId)
   const diffFocus = useDojo((state) => state.diffFocus)
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
+  const [changedFilter, setChangedFilter] = useState<{ sinceFocusRequest: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const observe = useNearViewport(scroller)
-  const plan = tour?.tour ?? null
-  const files = useMemo(() => diff.files.map((file) => ({ file, segments: fileSegments(file, plan) })), [diff, plan])
+  const changedPaths = useMemo(() => new Set(review.previous?.changedPaths), [review.previous])
+  const changedFiles = diff.files.filter((file) => changedPaths.has(file.path)).length
+  const files = useMemo(
+    () =>
+      diff.files
+        .filter((file) => !changedFilter || changedPaths.has(file.path))
+        .map((file) => ({ file, segments: fileSegments(file, tour) })),
+    [diff, tour, changedFilter, changedPaths],
+  )
+  // Only a stop chosen after the filter was turned on reveals hidden files again.
+  const focusHidden =
+    changedFilter !== null &&
+    diffFocus !== null &&
+    diffFocus.request > changedFilter.sinceFocusRequest &&
+    !files.some(({ file }) => file.hunks.some((hunk) => hunk.id === diffFocus.hunkId))
 
   useScrollSpy(scroller)
   useEffect(() => {
+    if (focusHidden) setChangedFilter(null)
+  }, [focusHidden])
+  useEffect(() => {
     const content = contentRef.current
-    return scroller && content && diffFocus ? holdHunkInView(scroller, content, diffFocus.hunkId) : undefined
-  }, [scroller, diffFocus])
+    return scroller && content && diffFocus && !focusHidden
+      ? holdHunkInView(scroller, content, diffFocus.hunkId)
+      : undefined
+  }, [scroller, diffFocus, focusHidden])
 
   return (
     <section
@@ -47,11 +67,30 @@ export function FullDiff() {
       }
       aria-label="Full diff"
     >
-      {files.length === 0 ? <p className={styles.muted}>This pull request changes no files.</p> : null}
+      {changedFiles > 0 && review.previous ? (
+        <label className={styles.filter}>
+          <input
+            type="checkbox"
+            checked={changedFilter !== null}
+            onChange={() => setChangedFilter(changedFilter ? null : { sinceFocusRequest: diffFocus?.request ?? 0 })}
+          />
+          Only changes since my review
+          <span className={styles.filterCount}>
+            {changedFiles} {changedFiles === 1 ? 'file' : 'files'} since {review.previous.headSha.slice(0, 7)}
+          </span>
+        </label>
+      ) : null}
+      {diff.files.length === 0 ? <p className={styles.muted}>This pull request changes no files.</p> : null}
       <div ref={contentRef}>
         <NearViewport.Provider value={observe}>
           {files.map(({ file, segments }) => (
-            <FileCard key={file.path} file={file} segments={segments} selectedStopId={selectedStopId} />
+            <FileCard
+              key={file.path}
+              file={file}
+              segments={segments}
+              selectedStopId={selectedStopId}
+              changedSinceReview={changedPaths.has(file.path)}
+            />
           ))}
         </NearViewport.Provider>
       </div>
@@ -63,9 +102,10 @@ interface FileCardProps {
   file: DiffFile
   segments: Segment[]
   selectedStopId: string | null
+  changedSinceReview: boolean
 }
 
-const FileCard = memo(function FileCard({ file, segments, selectedStopId }: FileCardProps) {
+const FileCard = memo(function FileCard({ file, segments, selectedStopId, changedSinceReview }: FileCardProps) {
   const [generatedShown, setGeneratedShown] = useState(false)
   const collapsed = file.isGenerated && !generatedShown
 
@@ -80,6 +120,7 @@ const FileCard = memo(function FileCard({ file, segments, selectedStopId }: File
             {tag}
           </span>
         ))}
+        {changedSinceReview ? <span className={styles.changed}>Changed since your review</span> : null}
         <span className={styles.stats}>
           {file.deletions > 0 ? <span className={styles.deletions}>−{file.deletions}</span> : null}
           {file.additions > 0 ? <span className={styles.additions}>+{file.additions}</span> : null}

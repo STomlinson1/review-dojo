@@ -23,3 +23,13 @@ export function formatUsage(usage: Usage): string {
   if (usage.costUsd !== null) return `$${usage.costUsd.toFixed(2)}`
   return `${compact.format(usage.inputTokens)} in · ${compact.format(usage.outputTokens)} out tokens`
 }
+
+/** A one-line preview of a Markdown comment, skipping code such as a suggested change. */
+export function firstProseLine(markdown: string): string {
+  const prose = markdown
+    .replace(/```[\s\S]*?(?:```|$)/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 0)
+  return prose ?? (markdown.includes('```suggestion') ? 'Suggested a change.' : 'Shared a code snippet.')
+}

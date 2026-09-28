@@ -155,3 +155,27 @@
 .segment[data-dimmed='true'] .hunks:not(:focus-within) {
   opacity: 0.55;
 }
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.filterCount {
+  color: var(--text-tertiary);
+}
+
+.changed {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 18px;
+}

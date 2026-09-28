@@ -60,3 +60,19 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: var(--hairline);
+}
+
+.summaryLabel {
+  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

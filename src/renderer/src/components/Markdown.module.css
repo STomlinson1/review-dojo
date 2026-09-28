@@ -85,6 +85,7 @@
 }
 
 .codeRef code {
+  overflow-wrap: anywhere;
   color: var(--accent-text);
   text-decoration: underline dotted;
   text-underline-offset: 3px;

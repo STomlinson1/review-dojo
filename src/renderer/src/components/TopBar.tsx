@@ -2,20 +2,21 @@ import { Fragment } from 'react'
 import type { Stack } from '../../../shared/types'
 import { tourStops } from '../../../shared/tour'
 import { SIDE_BY_SIDE_MIN_WIDTH } from '../lib/layout'
-import { useDojo, useSession, useSideBySide } from '../store'
+import { useDojo, useSession, useSideBySide, useTour } from '../store'
 import { Button } from './Button'
 import { AskIcon, BackIcon, FocusLayoutIcon, SettingsIcon, SideBySideLayoutIcon } from './icons'
 import styles from './TopBar.module.css'
 
 export function TopBar() {
-  const { pr, stack, tour, review } = useSession()
+  const { pr, stack, review } = useSession()
+  const tour = useTour()
   const dojoMode = useDojo((state) => state.dojoMode)
   const diffStyle = useDojo((state) => state.diffStyle)
   const askOpen = useDojo((state) => state.askOpen)
   const narrationTab = useDojo((state) => state.narrationTab)
   const sideBySide = useSideBySide().active
   const { closePullRequest, setDojoMode, setDiffStyle, setAskOpen, setNarrationTab, setOverlay } = useDojo.getState()
-  const stops = tour ? tourStops(tour.tour) : []
+  const stops = tour ? tourStops(tour) : []
   const asking = sideBySide ? narrationTab === 'ask' : askOpen
   const toggleAsk = () => (sideBySide ? setNarrationTab(asking ? 'stop' : 'ask') : setAskOpen(!askOpen))
 
