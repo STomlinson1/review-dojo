@@ -92,7 +92,7 @@ export function askSelection(range: SelectedLineRange, file: DiffFile): CodeSele
   const start = startSide === side ? range.start : newLineNear(file, range.start)
   const end = endSide === side ? range.end : newLineNear(file, range.end)
   return {
-    path: side === 'LEFT' ? (file.oldPath ?? file.path) : file.path,
+    path: file.path,
     side,
     startLine: Math.min(start, end),
     endLine: Math.max(start, end),

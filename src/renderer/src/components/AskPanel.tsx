@@ -203,7 +203,6 @@ export function AskPanel({ embedded = false }: { embedded?: boolean }) {
 }
 
 function SelectionChip({ selection }: { selection: CodeSelection }) {
-  const { diff } = useSession()
   const { setOverlay } = useDojo.getState()
   const label = selectionLabel(selection)
 
@@ -213,11 +212,10 @@ function SelectionChip({ selection }: { selection: CodeSelection }) {
       setOverlay({ kind: 'peek', target: { path: selection.path, ...location } })
       return
     }
-    const file = diff.files.find((candidate) => (candidate.oldPath ?? candidate.path) === selection.path)
     setOverlay({
       kind: 'peek',
       target: {
-        path: file?.path ?? selection.path,
+        path: selection.path,
         ...location,
         why: `You asked about lines ${selection.startLine}–${selection.endLine} of the old version of \`${selection.path}\`. This shows the file at the pull request's head, where those lines may differ.`,
       },

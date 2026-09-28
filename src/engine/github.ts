@@ -245,7 +245,7 @@ const THREADS_QUERY = `query($owner: String!, $repo: String!, $number: Int!, $en
       reviewThreads(first: 100, after: $endCursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
-          id path line startLine diffSide isResolved isOutdated
+          id path line startLine diffSide subjectType isResolved isOutdated
           comments(first: 50) { nodes { author { login } body createdAt url } }
         }
       }
@@ -264,6 +264,7 @@ interface ThreadsPage {
             line: number | null
             startLine: number | null
             diffSide: DiffSide
+            subjectType: 'LINE' | 'FILE'
             isResolved: boolean
             isOutdated: boolean
             comments: { nodes: { author: { login: string } | null; body: string; createdAt: string; url: string }[] }
@@ -294,8 +295,8 @@ export async function fetchThreads(ref: PrRef): Promise<ReviewThread[]> {
       id: thread.id,
       path: thread.path,
       side: thread.diffSide,
-      line: thread.line,
-      startLine: thread.startLine,
+      line: thread.subjectType === 'FILE' ? null : thread.line,
+      startLine: thread.subjectType === 'FILE' ? null : thread.startLine,
       isResolved: thread.isResolved,
       isOutdated: thread.isOutdated,
       comments: thread.comments.nodes.map((comment) => ({

@@ -173,6 +173,8 @@ export interface TourRecord {
   sessionId: string | null
   createdAt: string
   usage: Usage | null
+  /** The team review lessons the tour was held to. */
+  lessons: TeamLessons | null
   tour: Tour
 }
 
@@ -197,7 +199,7 @@ export interface DraftComment {
   createdAt: string
 }
 
-/** Lines the reviewer selected; LEFT refers to the file before the change. */
+/** Lines the reviewer selected in a diff file (`path` is its path in the PR); LEFT lines are numbered before the change. */
 export interface CodeSelection {
   path: string
   side: DiffSide
@@ -243,7 +245,7 @@ export interface ThreadComment {
   url: string
 }
 
-/** A GitHub review thread. `line` is null once the thread no longer maps onto the current diff. */
+/** A GitHub review thread. `line` is null for whole-file threads and once a thread no longer maps onto the diff. */
 export interface ReviewThread {
   id: string
   path: string

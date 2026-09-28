@@ -124,9 +124,9 @@ describe('diffAnnotations', () => {
 })
 
 describe('askSelection', () => {
-  it('reads an old-side selection from the old path', () => {
+  it('orders an old-side selection and keeps the file path for the engine to map', () => {
     expect(askSelection({ start: 12, end: 10, side: 'deletions' }, file)).toEqual({
-      path: 'a.ts',
+      path: 'b.ts',
       side: 'LEFT',
       startLine: 10,
       endLine: 12,

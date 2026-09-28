@@ -219,7 +219,11 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
     }))
     const record = await runTask('tour', (taskId) => dojo.generateTour(session.pr.ref, taskId))
     if (!record) return
-    set((state) => (state.session?.pr.url === session.pr.url ? { session: { ...state.session, tour: record } } : {}))
+    set((state) =>
+      state.session?.pr.url === session.pr.url
+        ? { session: { ...state.session, tour: record, lessons: record.lessons ?? state.session.lessons } }
+        : {},
+    )
   },
 
   cancelTask(key) {

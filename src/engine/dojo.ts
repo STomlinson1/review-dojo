@@ -153,6 +153,7 @@ export class Dojo {
       sessionId: result.sessionId,
       createdAt: new Date().toISOString(),
       usage: result.usage,
+      lessons,
       tour: normalizeTour(parsed.data, session.diff),
     }
     this.store.saveTour(record)
