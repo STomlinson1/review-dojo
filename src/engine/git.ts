@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, stat, utimes } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { Diff, PullRequest } from '../shared/types'
 import { parseDiff } from './diff'
@@ -55,9 +55,11 @@ export class Workspace {
       onStep('Checking out the PR head')
       await rm(worktree, { recursive: true, force: true })
       await mkdir(dirname(worktree), { recursive: true })
+      await removeStaleWorktrees(dirname(worktree), worktree)
       await git(clone, ['worktree', 'prune'], signal)
       await git(clone, ['worktree', 'add', '--force', '--detach', worktree, pr.headSha], signal)
     }
+    await utimes(worktree, new Date(), new Date())
 
     onStep('Computing the diff')
     const mergeBaseSha = (await git(clone, ['merge-base', pr.baseSha, pr.headSha], signal)).trim()
@@ -95,6 +97,21 @@ export class Workspace {
     )
     await rename(partial, clone)
   }
+}
+
+const WORKTREES_KEPT_PER_REPO = 6
+
+/** A full checkout per PR head adds up on large repositories, so only the most recently opened stay. */
+async function removeStaleWorktrees(repoDir: string, keep: string): Promise<void> {
+  const names = await readdir(repoDir).catch(() => [])
+  const entries = await Promise.all(
+    names
+      .map((name) => join(repoDir, name))
+      .filter((path) => path !== keep)
+      .map(async (path) => ({ path, used: (await stat(path)).mtimeMs })),
+  )
+  const stale = entries.sort((a, b) => b.used - a.used).slice(WORKTREES_KEPT_PER_REPO - 1)
+  await Promise.all(stale.map((entry) => rm(entry.path, { recursive: true, force: true })))
 }
 
 /** An interrupted checkout leaves a directory with missing files, which `status` reports. */
