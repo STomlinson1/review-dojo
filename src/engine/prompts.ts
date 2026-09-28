@@ -1,5 +1,6 @@
 import { selectHunks } from '../shared/tour'
 import type {
+  CodeSelection,
   Diff,
   DiffFile,
   Hunk,
@@ -19,6 +20,11 @@ Your job is to build that understanding, not to replace it: explain, point at ev
 questions a careful reviewer would ask. You are in a read-only checkout of the repository at the PR head.
 Never modify files. Dependencies are not installed. Ground every claim in code you have actually
 read, citing \`path:line\`.`
+
+export interface SelectedCode {
+  selection: CodeSelection
+  code: string
+}
 
 export interface TourContext {
   lessons: TeamLessons | null
@@ -84,11 +90,16 @@ Hunks are labeled [H#]. Generated files and lockfiles list their hunk ids but om
 ${renderDiff(diff)}`
 }
 
-export function askPrompt(stop: Stop | null, question: string): string {
+export function askPrompt(stop: Stop | null, question: string, selected: SelectedCode | null): string {
   const focus = stop
     ? `The reviewer is on the stop "${stop.title}" (hunks ${stop.hunkIds.join(', ') || 'none'}).`
     : 'The reviewer is looking at the PR overview.'
-  return `${focus}
+  const selection = selected
+    ? `\nThey selected ${selected.selection.path}:${selected.selection.startLine}-${selected.selection.endLine} (${
+        selected.selection.side === 'LEFT' ? 'before the change' : 'at the PR head'
+      }):\n\`\`\`\n${selected.code}\n\`\`\`\n`
+    : ''
+  return `${focus}${selection}
 
 Reviewer's question:
 ${question}

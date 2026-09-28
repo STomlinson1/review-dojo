@@ -197,11 +197,20 @@ export interface DraftComment {
   createdAt: string
 }
 
+/** Lines the reviewer selected; LEFT refers to the file before the change. */
+export interface CodeSelection {
+  path: string
+  side: DiffSide
+  startLine: number
+  endLine: number
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   text: string
   stopId: string | null
+  selection?: CodeSelection
   createdAt: string
 }
 
@@ -323,7 +332,13 @@ export interface DojoApi {
   recentReviews(): Promise<RecentReview[]>
   openPullRequest(url: string, taskId: string): Promise<PrSession>
   generateTour(pr: PrRef, taskId: string): Promise<TourRecord>
-  ask(pr: PrRef, stopId: string | null, question: string, taskId: string): Promise<ChatMessage>
+  ask(
+    pr: PrRef,
+    stopId: string | null,
+    question: string,
+    taskId: string,
+    selection?: CodeSelection,
+  ): Promise<ChatMessage>
   gradePrediction(pr: PrRef, stopId: string, prediction: string, taskId: string): Promise<string>
   polishComment(pr: PrRef, draft: DraftComment, taskId: string): Promise<string>
   cancel(taskId: string): Promise<void>

@@ -4,6 +4,7 @@ import { findStop } from '../shared/tour'
 import type {
   AgentEvent,
   ChatMessage,
+  CodeSelection,
   Diff,
   DraftComment,
   PrRef,
@@ -158,11 +159,22 @@ export class Dojo {
     provider: Provider,
     stopId: string | null,
     question: string,
+    selection: CodeSelection | null,
     task: TaskContext,
   ): Promise<ChatMessage> {
     const stop = stopId ? this.stop(ref, stopId) : null
-    const text = await this.converse(ref, provider, stop, askPrompt(stop, question), task)
+    const selected = selection ? { selection, code: await this.selectedCode(ref, selection) } : null
+    const text = await this.converse(ref, provider, stop, askPrompt(stop, question, selected), task)
     return { id: randomUUID(), role: 'assistant', text, stopId, createdAt: new Date().toISOString() }
+  }
+
+  private async selectedCode(ref: PrRef, selection: CodeSelection): Promise<string> {
+    const contents = await this.readFile(ref, selection.path, selection.side === 'LEFT' ? 'base' : 'head')
+    if (contents === null) throw new Error(`Couldn't read ${selection.path}.`)
+    return contents
+      .split('\n')
+      .slice(selection.startLine - 1, selection.endLine)
+      .join('\n')
   }
 
   gradePrediction(
