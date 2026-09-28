@@ -21,7 +21,7 @@ const OVERVIEW_STARTERS = [
   'Which changes are least related to the stated intent?',
 ]
 
-export function AskPanel() {
+export function AskPanel({ embedded = false }: { embedded?: boolean }) {
   const { tour, review } = useSession()
   const stopId = useDojo((state) => state.selectedStopId)
   const pending = useDojo((state) => state.tasks.ask)
@@ -51,18 +51,26 @@ export function AskPanel() {
   }
 
   return (
-    <aside className={styles.panel} aria-label="Ask">
+    <aside className={styles.panel} data-embedded={embedded} aria-label="Ask">
       <header className={styles.header}>
-        <h2 className={styles.title}>Ask</h2>
+        {embedded ? null : <h2 className={styles.title}>Ask</h2>}
         <span className={styles.scope}>
           {showAll ? 'Whole conversation' : <InlineCode>{stopTitle(stopId)}</InlineCode>}
         </span>
         <Button size="sm" variant="ghost" aria-pressed={showAll} onClick={() => setShowAll(!showAll)}>
           All
         </Button>
-        <Button size="sm" variant="ghost" aria-label="Close Ask" title="Close (Esc)" onClick={() => setAskOpen(false)}>
-          <CloseIcon />
-        </Button>
+        {embedded ? null : (
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-label="Close Ask"
+            title="Close (Esc)"
+            onClick={() => setAskOpen(false)}
+          >
+            <CloseIcon />
+          </Button>
+        )}
       </header>
 
       <div ref={logRef} className={styles.log}>

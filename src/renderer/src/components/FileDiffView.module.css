@@ -11,3 +11,17 @@
   font-family: var(--font-ui);
   font-size: var(--text-sm);
 }
+.fullDiffLink {
+  margin-left: var(--space-3);
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--accent-text);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+.fullDiffLink:hover {
+  background: var(--accent-soft);
+}

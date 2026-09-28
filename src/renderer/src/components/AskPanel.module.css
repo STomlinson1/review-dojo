@@ -7,6 +7,13 @@
   background: var(--surface);
 }
 
+.panel[data-embedded='true'] {
+  flex: 1;
+  width: auto;
+  min-height: 0;
+  border-left: 0;
+}
+
 .header {
   display: flex;
   align-items: center;

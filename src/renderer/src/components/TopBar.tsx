@@ -1,9 +1,10 @@
 import { Fragment } from 'react'
 import type { Stack } from '../../../shared/types'
 import { tourStops } from '../../../shared/tour'
-import { useDojo, useSession } from '../store'
+import { SIDE_BY_SIDE_MIN_WIDTH } from '../lib/layout'
+import { useDojo, useSession, useSideBySide } from '../store'
 import { Button } from './Button'
-import { AskIcon, BackIcon, SettingsIcon } from './icons'
+import { AskIcon, BackIcon, FocusLayoutIcon, SettingsIcon, SideBySideLayoutIcon } from './icons'
 import styles from './TopBar.module.css'
 
 export function TopBar() {
@@ -11,8 +12,12 @@ export function TopBar() {
   const dojoMode = useDojo((state) => state.dojoMode)
   const diffStyle = useDojo((state) => state.diffStyle)
   const askOpen = useDojo((state) => state.askOpen)
-  const { closePullRequest, setDojoMode, setDiffStyle, setAskOpen, setOverlay } = useDojo.getState()
+  const narrationTab = useDojo((state) => state.narrationTab)
+  const sideBySide = useSideBySide().active
+  const { closePullRequest, setDojoMode, setDiffStyle, setAskOpen, setNarrationTab, setOverlay } = useDojo.getState()
   const stops = tour ? tourStops(tour.tour) : []
+  const asking = sideBySide ? narrationTab === 'ask' : askOpen
+  const toggleAsk = () => (sideBySide ? setNarrationTab(asking ? 'stop' : 'ask') : setAskOpen(!askOpen))
 
   return (
     <header className={styles.bar}>
@@ -61,13 +66,14 @@ export function TopBar() {
             </button>
           ))}
         </div>
+        <LayoutSwitch />
         <Button
           variant="ghost"
           size="sm"
-          aria-pressed={askOpen}
+          aria-pressed={asking}
           disabled={!tour}
           title="Ask about this stop (/)"
-          onClick={() => setAskOpen(!askOpen)}
+          onClick={toggleAsk}
         >
           <AskIcon />
           Ask
@@ -88,6 +94,41 @@ export function TopBar() {
         </Button>
       </div>
     </header>
+  )
+}
+
+function LayoutSwitch() {
+  const { active, fits } = useSideBySide()
+  const { setLayout } = useDojo.getState()
+
+  return (
+    <div className={styles.segmented} role="group" aria-label="Layout">
+      <button
+        type="button"
+        className={styles.iconSegment}
+        aria-pressed={!active}
+        aria-label="Focus"
+        title="Focus: one stop at a time, with its own changes (\)"
+        onClick={() => setLayout('focus')}
+      >
+        <FocusLayoutIcon />
+      </button>
+      <button
+        type="button"
+        className={styles.iconSegment}
+        aria-pressed={active}
+        aria-disabled={!fits}
+        aria-label="Side by side"
+        title={
+          fits
+            ? 'Side by side: the tour next to the whole diff (\\)'
+            : `Side by side needs a window at least ${SIDE_BY_SIDE_MIN_WIDTH}px wide`
+        }
+        onClick={() => fits && setLayout('side-by-side')}
+      >
+        <SideBySideLayoutIcon />
+      </button>
+    </div>
   )
 }
 

@@ -7,6 +7,7 @@ import styles from './Sidebar.module.css'
 export function Sidebar() {
   const { tour, review } = useSession()
   const selectedStopId = useDojo((state) => state.selectedStopId)
+  const spiedStopId = useDojo((state) => state.spiedStopId)
   const { select } = useDojo.getState()
   if (!tour) return null
 
@@ -38,6 +39,7 @@ export function Sidebar() {
                     className={styles.stop}
                     aria-current={selectedStopId === stop.id ? 'page' : undefined}
                     data-visited={review.visitedStopIds.includes(stop.id)}
+                    data-in-view={spiedStopId === stop.id}
                     title={stop.title}
                     onClick={() => select(stop.id)}
                   >
@@ -58,7 +60,18 @@ export function Sidebar() {
         </section>
       ))}
       <p className={styles.keys}>
-        <kbd>j</kbd> <kbd>k</kbd> move · <kbd>u</kbd> understood · <kbd>/</kbd> ask
+        <span>
+          <kbd>j</kbd> <kbd>k</kbd> move
+        </span>
+        <span>
+          <kbd>u</kbd> understood
+        </span>
+        <span>
+          <kbd>/</kbd> ask
+        </span>
+        <span>
+          <kbd>\</kbd> layout
+        </span>
       </p>
     </nav>
   )

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 import type {
   ChatMessage,
@@ -14,7 +15,9 @@ import type {
   StopProgress,
 } from '../../shared/types'
 import { dojo, errorMessage, startTask } from './api'
-import { EMPTY_PROGRESS, tourStops } from '../../shared/tour'
+import { EMPTY_PROGRESS, findStop, tourStops } from '../../shared/tour'
+import { firstHunkInDiff } from './lib/fullDiff'
+import { type Layout, initialLayout, rememberLayout, sideBySideFits } from './lib/layout'
 
 export type TaskKey = 'open' | 'tour' | 'ask' | `grade:${string}` | `polish:${string}`
 
@@ -31,6 +34,13 @@ export type Overlay = { kind: 'settings' } | { kind: 'submit' } | { kind: 'peek'
 
 export type DiffStyle = 'unified' | 'split'
 
+type NarrationTab = 'stop' | 'ask'
+
+interface DiffFocus {
+  hunkId: string
+  request: number
+}
+
 interface DojoState {
   bootError: string | null
   settings: Settings | null
@@ -40,6 +50,10 @@ interface DojoState {
   selectedStopId: string | null
   dojoMode: boolean
   diffStyle: DiffStyle
+  layout: Layout
+  narrationTab: NarrationTab
+  diffFocus: DiffFocus | null
+  spiedStopId: string | null
   askOpen: boolean
   askFocusRequest: number
   overlay: Overlay
@@ -63,6 +77,10 @@ interface DojoActions {
   step(delta: 1 | -1): void
   setDojoMode(on: boolean): void
   setDiffStyle(style: DiffStyle): void
+  setLayout(layout: Layout): void
+  setNarrationTab(tab: NarrationTab): void
+  showInFullDiff(hunkId: string): void
+  setSpiedStopId(stopId: string | null): void
   setAskOpen(open: boolean): void
   focusAsk(): void
   setOverlay(overlay: Overlay): void
@@ -97,6 +115,10 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   selectedStopId: null,
   dojoMode: false,
   diffStyle: 'unified',
+  layout: initialLayout(),
+  narrationTab: 'stop',
+  diffFocus: null,
+  spiedStopId: null,
   askOpen: true,
   askFocusRequest: 0,
   overlay: null,
@@ -144,6 +166,8 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
     set((state) => ({
       session,
       selectedStopId: null,
+      diffFocus: null,
+      spiedStopId: null,
       dojoMode: state.settings?.dojoMode ?? state.dojoMode,
       overlay: null,
       errors: {},
@@ -155,7 +179,15 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   closePullRequest() {
     void flushReview()
     cancelSessionTasks()
-    set({ session: null, selectedStopId: null, overlay: null, errors: {}, polishSuggestions: {} })
+    set({
+      session: null,
+      selectedStopId: null,
+      diffFocus: null,
+      spiedStopId: null,
+      overlay: null,
+      errors: {},
+      polishSuggestions: {},
+    })
   },
 
   async generateTour() {
@@ -191,7 +223,13 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   },
 
   select(stopId) {
-    set({ selectedStopId: stopId })
+    const session = get().session
+    const stop = stopId && session?.tour ? findStop(session.tour.tour, stopId)?.stop : undefined
+    const hunkId = stop && session ? firstHunkInDiff(session.diff, stop.hunkIds) : null
+    set((state) => ({
+      selectedStopId: stopId,
+      diffFocus: hunkId ? nextFocus(state.diffFocus, hunkId) : state.diffFocus,
+    }))
     if (stopId === null) return
     updateReview((review) =>
       review.visitedStopIds.includes(stopId)
@@ -216,12 +254,30 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
     set({ diffStyle: style })
   },
 
+  setLayout(layout) {
+    rememberLayout(layout)
+    set({ layout })
+  },
+
+  setNarrationTab(tab) {
+    set({ narrationTab: tab })
+  },
+
+  showInFullDiff(hunkId) {
+    get().setLayout('side-by-side')
+    set((state) => ({ diffFocus: nextFocus(state.diffFocus, hunkId) }))
+  },
+
+  setSpiedStopId(stopId) {
+    if (get().spiedStopId !== stopId) set({ spiedStopId: stopId })
+  },
+
   setAskOpen(open) {
     set({ askOpen: open })
   },
 
   focusAsk() {
-    set((state) => ({ askOpen: true, askFocusRequest: state.askFocusRequest + 1 }))
+    set((state) => ({ askOpen: true, narrationTab: 'ask', askFocusRequest: state.askFocusRequest + 1 }))
   },
 
   setOverlay(overlay) {
@@ -311,6 +367,21 @@ export function useSession(): PrSession {
   return session
 }
 
+export function isSideBySide(layout: Layout): boolean {
+  return layout === 'side-by-side' && sideBySideFits.matches
+}
+
+export function useSideBySide(): { active: boolean; fits: boolean } {
+  const layout = useDojo((state) => state.layout)
+  const fits = useSyncExternalStore(subscribeToWidth, () => sideBySideFits.matches)
+  return { active: layout === 'side-by-side' && fits, fits }
+}
+
+function subscribeToWidth(onChange: () => void): () => void {
+  sideBySideFits.addEventListener('change', onChange)
+  return () => sideBySideFits.removeEventListener('change', onChange)
+}
+
 export function flushReview(): Promise<void> {
   clearTimeout(saveTimer)
   const review = unsavedReview
@@ -339,6 +410,10 @@ function updateReview(recipe: (review: ReviewState) => ReviewState, expectedPrUr
   clearTimeout(saveTimer)
   const delay = Math.min(SAVE_DELAY_MS, firstUnsavedAt + MAX_SAVE_DELAY_MS - Date.now())
   saveTimer = setTimeout(() => void flushReview(), Math.max(0, delay))
+}
+
+function nextFocus(current: DiffFocus | null, hunkId: string): DiffFocus {
+  return { hunkId, request: (current?.request ?? 0) + 1 }
 }
 
 function withStopProgress(review: ReviewState, stopId: string, patch: Partial<StopProgress>): ReviewState {

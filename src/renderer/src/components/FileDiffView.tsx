@@ -20,14 +20,23 @@ interface Composer {
 interface FileDiffViewProps {
   file: DiffFile
   hunks: Hunk[]
-  stopId: string
+  stopId: string | null
+  /** Rendered inside a surrounding file card that supplies the header and border. */
+  embedded?: boolean
+  linkToFullDiff?: boolean
 }
 
-export const FileDiffView = memo(function FileDiffView({ file, hunks, stopId }: FileDiffViewProps) {
+export const FileDiffView = memo(function FileDiffView({
+  file,
+  hunks,
+  stopId,
+  embedded = false,
+  linkToFullDiff = false,
+}: FileDiffViewProps) {
   const prRef = useDojo((state) => state.session?.pr.ref)
   const allDrafts = useDojo((state) => state.session?.review.drafts)
   const diffStyle = useDojo((state) => state.diffStyle)
-  const { addDraft } = useDojo.getState()
+  const { addDraft, showInFullDiff } = useDojo.getState()
   const [dragRange, setDragRange] = useState<SelectedLineRange | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
 
@@ -62,7 +71,10 @@ export const FileDiffView = memo(function FileDiffView({ file, hunks, stopId }: 
       diffStyle,
       themeType: 'system',
       lineDiffType: 'word-alt',
-      hunkSeparators: 'line-info',
+      // Gap sizes are measured from the previous hunk in the patch, so they overstate the
+      // unchanged lines whenever hunks from other stops were left out.
+      hunkSeparators: showsWholeFile ? 'line-info' : 'simple',
+      disableFileHeader: embedded,
       overflow: 'scroll',
       enableLineSelection: true,
       enableGutterUtility: true,
@@ -71,7 +83,7 @@ export const FileDiffView = memo(function FileDiffView({ file, hunks, stopId }: 
       onGutterUtilityClick: openComposer,
       loadDiffFiles,
     }),
-    [diffStyle, openComposer, loadDiffFiles],
+    [diffStyle, openComposer, loadDiffFiles, showsWholeFile, embedded],
   )
 
   const annotations = useMemo(() => {
@@ -116,13 +128,22 @@ export const FileDiffView = memo(function FileDiffView({ file, hunks, stopId }: 
 
   return (
     <PatchDiff
-      className={styles.diff}
+      className={embedded ? undefined : styles.diff}
       patch={patch}
       options={options}
       lineAnnotations={annotations}
       selectedLines={dragRange ?? (composer ? composerSelection(composer) : null)}
       renderAnnotation={renderAnnotation}
-      renderHeaderFilenameSuffix={() => <FileNote file={file} shown={hunks.length} />}
+      renderHeaderFilenameSuffix={() => (
+        <>
+          <FileNote file={file} shown={hunks.length} />
+          {linkToFullDiff ? (
+            <button type="button" className={styles.fullDiffLink} onClick={() => showInFullDiff(hunks[0].id)}>
+              Show in full diff
+            </button>
+          ) : null}
+        </>
+      )}
     />
   )
 })

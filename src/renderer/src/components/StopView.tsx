@@ -8,7 +8,7 @@ import type {
 } from '../../../shared/types'
 import { formatLocation } from '../lib/codeRefs'
 import { EMPTY_PROGRESS, findStop, selectHunks, tourStops } from '../../../shared/tour'
-import { useDojo, useSession } from '../store'
+import { useDojo, useSession, useSideBySide } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
@@ -17,9 +17,10 @@ import { InlineCode, Markdown } from './Markdown'
 import { RiskBadge } from './Risk'
 import styles from './StopView.module.css'
 
-export function StopView({ stopId }: { stopId: string }) {
+export function StopView({ stopId, showDiffs }: { stopId: string; showDiffs: boolean }) {
   const { diff, tour, review } = useSession()
   const dojoMode = useDojo((state) => state.dojoMode)
+  const { fits: canShowFullDiff } = useSideBySide()
   const found = tour ? findStop(tour.tour, stopId) : null
   const hunkIds = found?.stop.hunkIds
   const files = useMemo(() => {
@@ -61,13 +62,15 @@ export function StopView({ stopId }: { stopId: string }) {
         </div>
       )}
 
-      <section className={styles.diffs} aria-label="Changes in this stop">
-        {files.length === 0 ? (
-          <p className={styles.muted}>This stop changes no lines. It points at related code to read.</p>
-        ) : (
-          files.map(({ file, hunks }) => <FileDiffView key={file.path} file={file} hunks={hunks} stopId={stop.id} />)
-        )}
-      </section>
+      {files.length === 0 ? (
+        <p className={styles.muted}>This stop changes no lines. It points at related code to read.</p>
+      ) : showDiffs ? (
+        <section className={styles.diffs} aria-label="Changes in this stop">
+          {files.map(({ file, hunks }) => (
+            <FileDiffView key={file.path} file={file} hunks={hunks} stopId={stop.id} linkToFullDiff={canShowFullDiff} />
+          ))}
+        </section>
+      ) : null}
 
       {gated ? null : (
         <div className={styles.reading}>
@@ -112,7 +115,7 @@ function DojoCard({
           rows={4}
           value={progress.prediction}
           onChange={(event) => updateStop(stopId, { prediction: event.target.value })}
-          placeholder="Read the diff below, then commit to an answer in your own words."
+          placeholder="Read the diff, then commit to an answer in your own words."
         />
         <div className={styles.dojoActions}>
           <Button variant="primary" disabled={!hasPrediction} onClick={() => updateStop(stopId, { revealed: true })}>

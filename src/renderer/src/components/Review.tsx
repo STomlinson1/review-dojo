@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { useDojo } from '../store'
+import { sideBySideFits } from '../lib/layout'
+import { isSideBySide, useDojo, useSideBySide } from '../store'
 import { AskPanel } from './AskPanel'
 import { Button } from './Button'
+import { FullDiff } from './FullDiff'
 import { Overview } from './Overview'
 import styles from './Review.module.css'
 import { Sidebar } from './Sidebar'
@@ -11,33 +13,76 @@ import { TourEmpty } from './TourEmpty'
 
 export function Review() {
   const hasTour = useDojo((state) => state.session?.tour != null)
-  const selectedStopId = useDojo((state) => state.selectedStopId)
   const askOpen = useDojo((state) => state.askOpen)
-  const mainRef = useRef<HTMLElement>(null)
+  const sideBySide = useSideBySide().active
 
   useShortcuts()
-  useEffect(() => {
-    mainRef.current?.scrollTo({ top: 0 })
-  }, [selectedStopId])
 
   return (
     <div className={styles.review}>
       <TopBar />
       <StatusBanner />
-      <div className={styles.body}>
+      <div className={styles.body} data-layout={sideBySide ? 'side-by-side' : 'focus'}>
         {hasTour ? <Sidebar /> : null}
-        <main ref={mainRef} className={styles.main}>
-          {!hasTour ? (
-            <TourEmpty />
-          ) : selectedStopId ? (
-            <StopView key={selectedStopId} stopId={selectedStopId} />
-          ) : (
-            <Overview />
-          )}
-        </main>
-        {hasTour && askOpen ? <AskPanel /> : null}
+        {sideBySide ? (
+          <>
+            <Narration />
+            <FullDiff />
+          </>
+        ) : (
+          <>
+            <Guide showDiffs />
+            {hasTour && askOpen ? <AskPanel /> : null}
+          </>
+        )}
       </div>
     </div>
+  )
+}
+
+function Narration() {
+  const hasTour = useDojo((state) => state.session?.tour != null)
+  const tab = useDojo((state) => state.narrationTab)
+  const selectedStopId = useDojo((state) => state.selectedStopId)
+  const { setNarrationTab } = useDojo.getState()
+  const asking = hasTour && tab === 'ask'
+
+  return (
+    <div className={styles.narration}>
+      {hasTour ? (
+        <div className={styles.tabs} role="group" aria-label="Narration">
+          <button type="button" aria-pressed={!asking} onClick={() => setNarrationTab('stop')}>
+            {selectedStopId ? 'Stop' : 'Overview'}
+          </button>
+          <button type="button" aria-pressed={asking} onClick={() => setNarrationTab('ask')}>
+            Ask
+          </button>
+        </div>
+      ) : null}
+      {asking ? <AskPanel embedded /> : <Guide showDiffs={false} />}
+    </div>
+  )
+}
+
+function Guide({ showDiffs }: { showDiffs: boolean }) {
+  const hasTour = useDojo((state) => state.session?.tour != null)
+  const selectedStopId = useDojo((state) => state.selectedStopId)
+  const ref = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    ref.current?.scrollTo({ top: 0 })
+  }, [selectedStopId])
+
+  return (
+    <main ref={ref} className={styles.main}>
+      {!hasTour ? (
+        <TourEmpty />
+      ) : selectedStopId ? (
+        <StopView key={selectedStopId} stopId={selectedStopId} showDiffs={showDiffs} />
+      ) : (
+        <Overview />
+      )}
+    </main>
   )
 }
 
@@ -87,13 +132,20 @@ function useShortcuts() {
       const state = useDojo.getState()
       if (state.overlay) return
       const stopId = state.selectedStopId
+      const sideBySide = isSideBySide(state.layout)
+      if (event.key === '\\') {
+        if (sideBySideFits.matches) state.setLayout(sideBySide ? 'focus' : 'side-by-side')
+        event.preventDefault()
+        return
+      }
       if (!state.session?.tour) return
       if (event.key === 'j') state.step(1)
       else if (event.key === 'k') state.step(-1)
       else if (event.key === 'u' && stopId) {
         state.updateStop(stopId, { understood: !state.session.review.stops[stopId]?.understood })
       } else if (event.key === '/') state.focusAsk()
-      else if (event.key === 'Escape' && state.askOpen) state.setAskOpen(false)
+      else if (event.key === 'Escape' && sideBySide && state.narrationTab === 'ask') state.setNarrationTab('stop')
+      else if (event.key === 'Escape' && !sideBySide && state.askOpen) state.setAskOpen(false)
       else return
       event.preventDefault()
     }

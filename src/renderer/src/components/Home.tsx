@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PROVIDER_NAMES } from '../../../shared/providers'
-import type { PrSummary } from '../../../shared/types'
+import type { PrSummary, RecentReview } from '../../../shared/types'
 import { dojo, errorMessage } from '../api'
 import { relativeTime } from '../lib/format'
 import { useDojo } from '../store'
@@ -63,6 +63,7 @@ export function Home() {
         {openError ? <ErrorNote title="Couldn't open that pull request" message={openError} /> : null}
 
         <ReviewRequestList disabled={opening !== undefined} onOpen={(url) => void openPullRequest(url)} />
+        <RecentReviewList disabled={opening !== undefined} onOpen={(url) => void openPullRequest(url)} />
       </main>
     </div>
   )
@@ -175,6 +176,46 @@ function ReviewRequestList({ disabled, onOpen }: { disabled: boolean; onOpen(url
           ))}
         </ul>
       ) : null}
+    </section>
+  )
+}
+
+function RecentReviewList({ disabled, onOpen }: { disabled: boolean; onOpen(url: string): void }) {
+  const [recent, setRecent] = useState<RecentReview[]>([])
+
+  useEffect(() => {
+    let current = true
+    dojo.recentReviews().then(
+      (items) => current && setRecent(items),
+      () => undefined,
+    )
+    return () => {
+      current = false
+    }
+  }, [])
+
+  if (recent.length === 0) return null
+  return (
+    <section className={styles.requests} aria-labelledby="recent-heading">
+      <div className={styles.sectionHeader}>
+        <h2 id="recent-heading" className={styles.sectionTitle}>
+          Recently opened
+        </h2>
+      </div>
+      <ul className={styles.requestList}>
+        {recent.map((item) => (
+          <li key={item.url}>
+            <button type="button" className={styles.request} disabled={disabled} onClick={() => onOpen(item.url)}>
+              <span className={styles.requestMain}>
+                <span className={styles.requestTitle}>{item.title}</span>
+                <span className={styles.requestMeta}>
+                  {item.ref.owner}/{item.ref.repo} #{item.ref.number} · {relativeTime(item.openedAt)}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

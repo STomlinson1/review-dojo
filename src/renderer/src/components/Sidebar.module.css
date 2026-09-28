@@ -37,6 +37,10 @@
   color: var(--accent-text);
 }
 
+.stop[data-in-view='true']:not([aria-current='page']) {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
 .chapter {
   margin-top: var(--space-4);
 }
@@ -90,6 +94,9 @@
 }
 
 .keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   margin-top: var(--space-5);
   padding: 0 var(--space-2);
   color: var(--text-tertiary);

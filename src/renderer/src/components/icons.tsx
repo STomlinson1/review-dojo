@@ -55,3 +55,17 @@ export const AskIcon = () => (
     <path d="M2.5 3.5h11v7.5H7.5l-3 2.5V11h-2z" />
   </Icon>
 )
+
+export const FocusLayoutIcon = () => (
+  <Icon>
+    <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
+    <path d="M5.5 3v10" />
+  </Icon>
+)
+
+export const SideBySideLayoutIcon = () => (
+  <Icon>
+    <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
+    <path d="M5.5 3v10M9 3v10" />
+  </Icon>
+)
