@@ -1,4 +1,4 @@
-import type { AgentEvent, ProviderId, ProviderSettings, ProviderStatus, Usage } from '../../shared/types'
+import type { AgentEvent, ProviderId, ProviderSettings, ProviderStatus, Usage, TaskEvent } from '../../shared/types'
 
 export interface AgentRequest {
   cwd: string
@@ -12,10 +12,14 @@ export interface AgentRequest {
   resume: string | null
   /** `repo` grants read-only repository tools; `none` is a plain completion. */
   tools: 'repo' | 'none'
-  /** Emit `draft` events while the answer is being written. */
   streamDrafts: boolean
   signal: AbortSignal
   onEvent: (event: AgentEvent) => void
+}
+
+export interface TaskContext {
+  signal: AbortSignal
+  onEvent: (event: TaskEvent) => void
 }
 
 export interface AgentResult {

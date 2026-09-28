@@ -212,7 +212,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   text: string
   stopId: string | null
-  selection?: CodeSelection
+  selection: CodeSelection | null
   createdAt: string
 }
 
@@ -339,8 +339,8 @@ export interface DojoApi {
     pr: PrRef,
     stopId: string | null,
     question: string,
+    selection: CodeSelection | null,
     taskId: string,
-    selection?: CodeSelection,
   ): Promise<ChatMessage>
   gradePrediction(pr: PrRef, stopId: string, prediction: string, taskId: string): Promise<string>
   polishComment(pr: PrRef, draft: DraftComment, taskId: string): Promise<string>

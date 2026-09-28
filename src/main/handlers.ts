@@ -1,5 +1,6 @@
 import { shell } from 'electron'
-import { Dojo, type TaskContext } from '../engine/dojo'
+import type { Dojo } from '../engine/dojo'
+import type { TaskContext } from '../engine/providers/provider'
 import { currentUser, listReviewRequests } from '../engine/github'
 import { createProvider } from '../engine/providers'
 import type { InvokeMethod } from '../shared/api'
@@ -49,8 +50,8 @@ export function createHandlers(dojo: Dojo, settings: SettingsStore, emit: (event
     recentReviews: () => dojo.recentReviews(),
     openPullRequest: (url, taskId) => task(taskId, (context) => dojo.openPullRequest(url, context)),
     generateTour: (ref, taskId) => task(taskId, async (context) => dojo.generateTour(ref, await provider(), context)),
-    ask: (ref, stopId, question, taskId, selection) =>
-      task(taskId, async (context) => dojo.ask(ref, await provider(), stopId, question, selection ?? null, context)),
+    ask: (ref, stopId, question, selection, taskId) =>
+      task(taskId, async (context) => dojo.ask(ref, await provider(), stopId, question, selection, context)),
     gradePrediction: (ref, stopId, prediction, taskId) =>
       task(taskId, async (context) => dojo.gradePrediction(ref, await provider(), stopId, prediction, context)),
     polishComment: (ref, draft, taskId) =>

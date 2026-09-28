@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { closeTruncatedJson, parseModelJson } from './json'
-import { selectHunks } from '../shared/tour'
-import type { Chapter, CodeLocation, Diff, Hunk, Risk, Stop, Tour } from '../shared/types'
+import { selectHunks, tourStops } from '../shared/tour'
+import type { AgentEvent, Chapter, CodeLocation, Diff, Hunk, Risk, Stop, TaskEvent, Tour } from '../shared/types'
 
 // Plain numbers: `.int()` emits safe-integer bounds, which Anthropic's schema subset rejects.
 const location = {
@@ -197,4 +197,17 @@ function fallbackStop(
 function clampLocation(location: CodeLocation): CodeLocation {
   const startLine = Math.max(1, Math.trunc(location.startLine))
   return { path: location.path, startLine, endLine: Math.max(startLine, Math.trunc(location.endLine)) }
+}
+
+/** A preview goes out only when another stop has become readable, never for the same or fewer stops. */
+export function previewTour(diff: Diff, onEvent: (event: TaskEvent) => void): (event: AgentEvent) => void {
+  let readableStops = -1
+  return (event) => {
+    if (event.kind !== 'draft') return onEvent(event)
+    const tour = partialTour(event.text, diff)
+    const stops = tour ? tourStops(tour).length : -1
+    if (!tour || stops <= readableStops) return
+    readableStops = stops
+    onEvent({ kind: 'tour', tour })
+  }
 }

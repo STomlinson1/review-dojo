@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import type { AgentEvent, PrRef, TeamLessons } from '../shared/types'
+import type { PrRef, TeamLessons } from '../shared/types'
 import { fetchPastReviewComments, type PastReviewComment } from './github'
 import { parseStructured } from './json'
-import type { Provider } from './providers/provider'
+import type { Provider, TaskContext } from './providers/provider'
 
 const MIN_COMMENTS = 10
 const COMMENT_PAGES = 3
@@ -19,7 +19,7 @@ export async function learnLessons(
   ref: PrRef,
   provider: Provider,
   cwd: string,
-  task: { signal: AbortSignal; onEvent: (event: AgentEvent) => void },
+  task: TaskContext,
 ): Promise<TeamLessons> {
   task.onEvent({ kind: 'step', text: "Reading this team's past review comments" })
   const comments = await fetchPastReviewComments(ref, COMMENT_PAGES)

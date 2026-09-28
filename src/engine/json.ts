@@ -49,7 +49,7 @@ function repairStrings(json: string): string {
   return output
 }
 
-export type Parsed<T> = { success: true; data: T } | { success: false; error: string }
+type Parsed<T> = { success: true; data: T } | { success: false; error: string }
 
 export function parseStructured<T>(text: string, schema: ZodType<T>): Parsed<T> {
   try {

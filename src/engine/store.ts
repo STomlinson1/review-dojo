@@ -1,5 +1,5 @@
 import { readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { readJson, writeJson } from './jsonFile'
 import { PROVIDER_IDS } from '../shared/providers'
 import type {
@@ -64,23 +64,14 @@ export class Store {
 
   async recentReviews(limit: number): Promise<RecentReview[]> {
     const root = join(this.dataDir, 'reviews')
-    const owners = await readdir(root).catch(() => [])
+    const paths = await readdir(root, { recursive: true }).catch(() => [])
     const entries = await Promise.all(
-      owners.flatMap(async (owner) =>
-        Promise.all(
-          (await readdir(join(root, owner)).catch(() => [])).map(async (repo) =>
-            Promise.all(
-              (await readdir(join(root, owner, repo)).catch(() => [])).map((number) =>
-                readJson<RecentReview>(join(root, owner, repo, number, 'opened.json')).catch(() => null),
-              ),
-            ),
-          ),
-        ),
-      ),
+      paths
+        .filter((path) => path.endsWith(`${sep}opened.json`))
+        .map((path) => readJson<RecentReview>(join(root, path))),
     )
     return entries
-      .flat(2)
-      .filter((entry): entry is RecentReview => entry !== null)
+      .filter((entry) => entry !== null)
       .sort((a, b) => b.openedAt.localeCompare(a.openedAt))
       .slice(0, limit)
   }

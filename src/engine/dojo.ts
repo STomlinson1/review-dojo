@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { findStop, tourStops } from '../shared/tour'
+import { findStop } from '../shared/tour'
 import type {
-  AgentEvent,
   ChatMessage,
   CodeSelection,
   Diff,
@@ -18,7 +17,6 @@ import type {
   ReviewThread,
   Stack,
   Stop,
-  TaskEvent,
   TeamLessons,
   TourRecord,
 } from '../shared/types'
@@ -30,10 +28,10 @@ import { parseStructured } from './json'
 import { LESSONS_MAX_AGE_MS, learnLessons } from './lessons'
 import { resolveInside } from './paths'
 import { askPrompt, gradePrompt, polishPrompt, sessionSeedPrompt, tourPrompt, tourRepairPrompt } from './prompts'
-import type { Provider } from './providers/provider'
+import type { Provider, TaskContext } from './providers/provider'
 import { draftProblem, lineOnSide } from '../shared/review'
 import { Store } from './store'
-import { normalizeTour, partialTour, rawTourSchema, tourJsonSchema } from './tour'
+import { normalizeTour, previewTour, rawTourSchema, tourJsonSchema } from './tour'
 
 interface Conversation {
   sessionId: string | null
@@ -51,11 +49,6 @@ interface OpenPr {
   lessons: TeamLessons | null
   previous: PreviousReview | null
   conversations: Partial<Record<ProviderId, Conversation>>
-}
-
-export interface TaskContext {
-  signal: AbortSignal
-  onEvent: (event: TaskEvent) => void
 }
 
 const refKey = (ref: PrRef) => `${ref.owner}/${ref.repo}#${ref.number}`
@@ -173,7 +166,7 @@ export class Dojo {
     const stop = stopId ? this.stop(ref, stopId) : null
     const selected = selection ? { selection, code: await this.selectedCode(ref, selection) } : null
     const text = await this.converse(ref, provider, stop, askPrompt(stop, question, selected), task)
-    return { id: randomUUID(), role: 'assistant', text, stopId, createdAt: new Date().toISOString() }
+    return { id: randomUUID(), role: 'assistant', text, stopId, selection: null, createdAt: new Date().toISOString() }
   }
 
   private async selectedCode(ref: PrRef, selection: CodeSelection): Promise<string> {
@@ -347,19 +340,6 @@ export class Dojo {
     const found = tour ? findStop(tour, stopId) : null
     if (!found) throw new Error(`Unknown stop ${stopId}.`)
     return found.stop
-  }
-}
-
-/** Turns streamed drafts of the tour JSON into previews, sent only when another stop becomes readable. */
-function previewTour(diff: Diff, onEvent: (event: TaskEvent) => void): (event: AgentEvent) => void {
-  let readableStops = -1
-  return (event) => {
-    if (event.kind !== 'draft') return onEvent(event)
-    const tour = partialTour(event.text, diff)
-    const stops = tour ? tourStops(tour).length : -1
-    if (!tour || stops <= readableStops) return
-    readableStops = stops
-    onEvent({ kind: 'tour', tour })
   }
 }
 

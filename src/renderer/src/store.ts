@@ -337,7 +337,7 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   async ask(question) {
     const { session, selectedStopId, tasks, askSelection } = get()
     if (!session || tasks.ask || tourPreview(get())) return
-    const selection = askSelection ?? undefined
+    const selection = askSelection
     const asked: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -349,7 +349,7 @@ export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
     set({ askSelection: null })
     updateReview((review) => ({ ...review, chat: [...review.chat, asked] }))
     const answer = await runTask('ask', (taskId) =>
-      dojo.ask(session.pr.ref, selectedStopId, question, taskId, selection),
+      dojo.ask(session.pr.ref, selectedStopId, question, selection, taskId),
     )
     if (answer) updateReview((review) => ({ ...review, chat: [...review.chat, answer] }), session.pr.url)
   },

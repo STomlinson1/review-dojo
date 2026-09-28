@@ -36,7 +36,8 @@ src/renderer   React UI.
    worktree at the head SHA.
 3. Diff `merge-base(base, head)..head` (what GitHub shows), parse into files and hunks with
    stable ids.
-4. Before the first tour of a repository (and every 14 days), the provider distills team review
+4. Before the first tour of a repository (then every 14 days, or on demand from the Overview), the
+   provider distills team review
    lessons from its recent review comments. The tour prompt carries those lessons, open review
    threads, and the files changed since the reviewer's last review of the PR.
 5. Provider agent runs in the worktree with read-only tools and returns a `Tour` (JSON schema). The

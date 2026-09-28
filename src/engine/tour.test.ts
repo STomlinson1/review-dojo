@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Diff, DiffFile } from '../shared/types'
-import { normalizeTour, partialTour, type RawTour } from './tour'
+import type { Diff, DiffFile, TaskEvent } from '../shared/types'
+import { normalizeTour, partialTour, previewTour, type RawTour } from './tour'
 
 function file(path: string, hunkIds: string[], isGenerated = false): DiffFile {
   return {
@@ -96,5 +96,22 @@ describe('partialTour', () => {
 
   it('waits until the summary is complete', () => {
     expect(partialTour('{"summary": "The PR chan', diff)).toBeNull()
+  })
+})
+
+describe('previewTour', () => {
+  it('sends a preview only when another stop becomes readable', () => {
+    const finished = JSON.stringify(raw([stop(['H1'], 'first'), stop(['H2'], 'second')]))
+    const events: TaskEvent[] = []
+    const onDraft = previewTour(diff, (event) => events.push(event))
+    const draft = (text: string) => onDraft({ kind: 'draft', text })
+    draft(finished.slice(0, finished.indexOf('"first"')))
+    draft(finished.slice(0, finished.indexOf('"second"')))
+    draft(finished.slice(0, finished.indexOf('"second"') + 10))
+    draft(finished)
+    onDraft({ kind: 'step', text: 'Read a.ts' })
+    expect(
+      events.map((event) => (event.kind === 'tour' ? (event.tour.chapters[0]?.stops.length ?? 0) : event.kind)),
+    ).toEqual([0, 1, 2, 'step'])
   })
 })
