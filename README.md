@@ -48,6 +48,9 @@ Nothing runs on a server. Traffic goes only to GitHub and to the model provider 
 Subscription sign-in is for your own individual use on your own machine; Anthropic requires API keys
 for anything offered to other people.
 
+Both providers produce the full tour. Claude streams, so stops and answers appear while they're being
+written; Codex delivers each tour and answer when it's complete.
+
 ## Run
 
 ```sh
