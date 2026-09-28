@@ -116,7 +116,13 @@ export class Dojo {
     const session = this.session(ref)
     const lessons = await this.currentLessons(ref, provider, task)
     task.onEvent({ kind: 'step', text: `Exploring the repository with ${provider.id}` })
-    const request = { cwd: session.worktree, schema: tourJsonSchema, tools: 'repo' as const, ...task }
+    const request = {
+      cwd: session.worktree,
+      schema: tourJsonSchema,
+      tools: 'repo' as const,
+      streamDrafts: false,
+      ...task,
+    }
     const context = { lessons, threads: session.threads, previous: session.previous }
     let result = await provider.run({
       ...request,
@@ -178,6 +184,7 @@ export class Dojo {
       schema: null,
       resume: null,
       tools: 'none',
+      streamDrafts: false,
       ...task,
     })
     return result.text.trim()
@@ -289,6 +296,7 @@ export class Dojo {
             schema: null,
             resume,
             tools: 'repo',
+            streamDrafts: true,
             ...task,
           })
         const resume = conversation.sessionId

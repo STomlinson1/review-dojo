@@ -3,7 +3,7 @@ import { Codex, type ThreadOptions } from '@openai/codex-sdk'
 import type { ProviderStatus } from '../../shared/types'
 import { CommandError, run } from '../exec'
 import { codexBinary, codexVendorDir } from './binaries'
-import type { AgentRequest, AgentResult, Provider, ProviderConfig } from './provider'
+import { type AgentRequest, type AgentResult, draftStream, type Provider, type ProviderConfig } from './provider'
 
 /**
  * Without an explicit key the bundled Codex CLI uses the user's `codex login` (ChatGPT) session.
@@ -47,6 +47,7 @@ export class CodexProvider implements Provider {
       ...(request.schema ? { outputSchema: request.schema } : {}),
     })
 
+    const drafts = draftStream(request.onEvent)
     let finalText = ''
     let usage: AgentResult['usage'] = null
     for await (const event of events) {
@@ -54,6 +55,9 @@ export class CodexProvider implements Provider {
         case 'item.started':
           if (event.item.type === 'command_execution')
             request.onEvent({ kind: 'step', text: `$ ${event.item.command}` })
+          break
+        case 'item.updated':
+          if (request.streamDrafts && event.item.type === 'agent_message') drafts.update(event.item.text)
           break
         case 'item.completed':
           if (event.item.type === 'reasoning' && event.item.text.trim())

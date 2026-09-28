@@ -303,8 +303,9 @@ export interface EnvironmentStatus {
 
 export type ReviewEvent = 'PENDING' | 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES'
 
+/** `draft` carries the whole answer written so far, replacing any earlier draft. */
 export interface AgentEvent {
-  kind: 'step' | 'text'
+  kind: 'step' | 'text' | 'draft'
   text: string
 }
 

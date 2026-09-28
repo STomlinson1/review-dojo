@@ -3,7 +3,7 @@ import type { ProviderStatus } from '../../shared/types'
 import { run } from '../exec'
 import { resolveInside } from '../paths'
 import { claudeBinary } from './binaries'
-import type { AgentRequest, AgentResult, Provider, ProviderConfig } from './provider'
+import { type AgentRequest, type AgentResult, draftStream, type Provider, type ProviderConfig } from './provider'
 
 /**
  * Subscription mode strips every credential variable so the bundled Claude Code falls back to the
@@ -56,6 +56,7 @@ export class ClaudeProvider implements Provider {
       abortController,
       pathToClaudeCodeExecutable: claudeBinary(),
       maxTurns: request.schema ? 150 : 40,
+      includePartialMessages: request.streamDrafts,
       ...(request.resume ? { resume: request.resume } : {}),
     }
     // The SDK's structured output makes the model emit one large tool call, which fails outright on
@@ -64,11 +65,23 @@ export class ClaudeProvider implements Provider {
       ? `${request.prompt}\n\nWhen you are done exploring, reply with only a JSON object matching this JSON Schema:\n${JSON.stringify(request.schema)}`
       : request.prompt
 
+    const drafts = draftStream(request.onEvent)
+    let draft = ''
     try {
       let sessionId: string | null = null
       for await (const message of query({ prompt, options })) {
         if (message.type === 'system' && message.subtype === 'init') {
           sessionId = message.session_id
+          continue
+        }
+        if (message.type === 'stream_event' && !message.parent_tool_use_id) {
+          const { event } = message
+          if (event.type === 'content_block_start' && event.content_block.type === 'text') draft = ''
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            draft += event.delta.text
+            drafts.update(draft)
+          }
+          if (event.type === 'content_block_stop') drafts.flush()
           continue
         }
         if (message.type === 'assistant' && !message.parent_tool_use_id) {

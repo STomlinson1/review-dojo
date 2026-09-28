@@ -33,6 +33,7 @@ export async function learnLessons(
     schema: lessonsJsonSchema,
     resume: null,
     tools: 'none',
+    streamDrafts: false,
     ...task,
   })
   const parsed = parseStructured(result.text, lessonsSchema)

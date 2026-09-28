@@ -12,6 +12,8 @@ export interface AgentRequest {
   resume: string | null
   /** `repo` grants read-only repository tools; `none` is a plain completion. */
   tools: 'repo' | 'none'
+  /** Emit `draft` events while the answer is being written. */
+  streamDrafts: boolean
   signal: AbortSignal
   onEvent: (event: AgentEvent) => void
 }
@@ -31,4 +33,26 @@ export interface Provider {
   readonly model: string
   run(request: AgentRequest): Promise<AgentResult>
   status(): Promise<ProviderStatus>
+}
+
+const DRAFT_INTERVAL_MS = 120
+
+/** Throttles `draft` events so a fast token stream doesn't flood the renderer. */
+export function draftStream(onEvent: (event: AgentEvent) => void): { update(text: string): void; flush(): void } {
+  let latest = ''
+  let sent = ''
+  let lastSentAt = 0
+  const send = () => {
+    if (latest === sent || !latest.trim()) return
+    sent = latest
+    lastSentAt = Date.now()
+    onEvent({ kind: 'draft', text: latest })
+  }
+  return {
+    update(text) {
+      latest = text
+      if (Date.now() - lastSentAt >= DRAFT_INTERVAL_MS) send()
+    },
+    flush: send,
+  }
 }
