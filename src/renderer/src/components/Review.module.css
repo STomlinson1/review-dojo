@@ -1,0 +1,41 @@
+.review {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border-bottom: var(--hairline);
+  background: var(--accent-soft);
+  font-size: var(--text-sm);
+}
+
+.banner[data-tone='error'] {
+  background: var(--risk-high-soft);
+}
+
+.bannerText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

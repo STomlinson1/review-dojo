@@ -1,0 +1,73 @@
+.log {
+  border: var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+}
+
+.pulse {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+
+.meta {
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.events {
+  padding: var(--space-2) var(--space-3);
+  border-top: var(--hairline);
+  background: var(--surface-sunken);
+  list-style: none;
+}
+
+.event {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: appear 180ms var(--ease-out);
+}
+
+.event[data-kind='step'] {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.event[data-kind='text'] {
+  font-style: italic;
+}
+
+@keyframes appear {
+  from {
+    transform: translateY(3px);
+  }
+}

@@ -1,0 +1,55 @@
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { parseArgs } from 'node:util'
+import { Docent } from './engine/docent'
+import { apiKeyFromEnv, createProvider } from './engine/providers'
+import { DEFAULT_SETTINGS, PROVIDER_IDS } from './shared/providers'
+import type { AgentEvent, ProviderId } from './shared/types'
+
+const USAGE = `Usage: docent tour <pr-url | owner/repo#number> [--provider claude|codex] [--model <id>]
+
+Prints the tour as JSON on stdout and progress on stderr. Uses ANTHROPIC_API_KEY, or CODEX_API_KEY /
+OPENAI_API_KEY, when set; otherwise your \`claude auth login\` / \`codex login\` session.`
+
+async function main(): Promise<void> {
+  const { positionals, values } = parseArgs({
+    allowPositionals: true,
+    options: { provider: { type: 'string', default: 'claude' }, model: { type: 'string' } },
+  })
+  const [command, target] = positionals
+  const providerId = values.provider as ProviderId
+  if (command !== 'tour' || !target || !PROVIDER_IDS.includes(providerId)) {
+    console.error(USAGE)
+    process.exitCode = 2
+    return
+  }
+
+  const apiKey = apiKeyFromEnv(providerId)
+  const provider = createProvider(providerId, {
+    ...DEFAULT_SETTINGS[providerId],
+    auth: apiKey ? 'apiKey' : 'subscription',
+    apiKey,
+    ...(values.model ? { model: values.model } : {}),
+  })
+
+  const docent = new Docent(join(homedir(), 'Library', 'Application Support', 'Docent'))
+  const log = (text: string) => process.stderr.write(`${text}\n`)
+  const controller = new AbortController()
+  process.once('SIGINT', () => controller.abort())
+  const task = {
+    signal: controller.signal,
+    onEvent: (event: AgentEvent) => log(event.kind === 'step' ? `  ${event.text}` : `  » ${event.text.split('\n')[0]}`),
+  }
+  const session = await docent.openPullRequest(target, task)
+  log(
+    `${session.diff.files.length} files, ${session.diff.files.reduce((sum, file) => sum + file.hunks.length, 0)} hunks`,
+  )
+
+  const record = await docent.generateTour(session.pr.ref, provider, task)
+  process.stdout.write(`${JSON.stringify(record, null, 2)}\n`)
+}
+
+main().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error)
+  process.exitCode = 1
+})

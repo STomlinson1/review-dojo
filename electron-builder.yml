@@ -1,0 +1,15 @@
+appId: dev.docent.app
+productName: Docent
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+  - "**/node_modules/@openai/codex-*/**"
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dir
+  identity: null

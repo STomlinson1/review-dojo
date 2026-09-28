@@ -1,0 +1,43 @@
+.dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--risk-low);
+  opacity: 0.6;
+}
+
+.dot[data-risk='medium'] {
+  background: var(--risk-medium);
+  opacity: 1;
+}
+
+.dot[data-risk='high'] {
+  background: var(--risk-high);
+  opacity: 1;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--space-2);
+  border-radius: 10px;
+  background: var(--risk-low-soft);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.badge[data-risk='medium'] {
+  background: var(--risk-medium-soft);
+  color: var(--risk-medium);
+}
+
+.badge[data-risk='high'] {
+  background: var(--risk-high-soft);
+  color: var(--risk-high);
+}

@@ -1,0 +1,13 @@
+.diff {
+  display: block;
+  border: var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.fileNote {
+  margin-left: var(--space-2);
+  color: var(--text-tertiary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}

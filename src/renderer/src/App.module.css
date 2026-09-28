@@ -1,0 +1,14 @@
+.shell {
+  height: 100%;
+}
+
+.dragRegion {
+  height: var(--topbar-height);
+  -webkit-app-region: drag;
+}
+
+.center {
+  max-width: 560px;
+  margin: var(--space-8) auto 0;
+  padding: 0 var(--space-5);
+}

@@ -1,0 +1,214 @@
+:root {
+  color-scheme: light dark;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-prose: 14.5px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius: 6px;
+  --radius-sm: 4px;
+  --hairline: 1px solid var(--border);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --duration: 150ms;
+
+  --topbar-height: 44px;
+  --traffic-lights-inset: 78px;
+  --sidebar-width: 280px;
+  --ask-width: 380px;
+  --prose-width: 720px;
+
+  --bg: #fafaf9;
+  --surface: #ffffff;
+  --surface-sunken: #f3f3f1;
+  --surface-hover: rgba(24, 24, 27, 0.045);
+  --surface-active: rgba(24, 24, 27, 0.08);
+  --border: #e4e4e0;
+  --border-strong: #d0d0cb;
+  --text: #1c1c1f;
+  --text-secondary: #55575d;
+  --text-tertiary: #85878d;
+  --accent: #4b56b5;
+  --accent-hover: #3f49a0;
+  --accent-soft: rgba(75, 86, 181, 0.09);
+  --accent-text: #3d479c;
+  --on-accent: #ffffff;
+  --focus: rgba(75, 86, 181, 0.55);
+
+  --risk-high: #b93a30;
+  --risk-high-soft: rgba(185, 58, 48, 0.09);
+  --risk-medium: #93600b;
+  --risk-medium-soft: rgba(196, 132, 20, 0.12);
+  --risk-low: #85878d;
+  --risk-low-soft: rgba(133, 135, 141, 0.12);
+  --success: #2b7445;
+  --success-soft: rgba(43, 116, 69, 0.1);
+
+  --shadow-overlay: 0 12px 40px rgba(20, 20, 25, 0.18), 0 2px 8px rgba(20, 20, 25, 0.08);
+  --backdrop: rgba(20, 20, 24, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141417;
+    --surface: #1a1a1e;
+    --surface-sunken: #111114;
+    --surface-hover: rgba(255, 255, 255, 0.05);
+    --surface-active: rgba(255, 255, 255, 0.09);
+    --border: #2a2a30;
+    --border-strong: #3a3a42;
+    --text: #e9e9ec;
+    --text-secondary: #a6a7ae;
+    --text-tertiary: #75767e;
+    --accent: #8d97e6;
+    --accent-hover: #a2abef;
+    --accent-soft: rgba(141, 151, 230, 0.13);
+    --accent-text: #a9b1f0;
+    --on-accent: #111320;
+    --focus: rgba(141, 151, 230, 0.6);
+
+    --risk-high: #f07c70;
+    --risk-high-soft: rgba(240, 124, 112, 0.13);
+    --risk-medium: #e2ab52;
+    --risk-medium-soft: rgba(226, 171, 82, 0.13);
+    --risk-low: #75767e;
+    --risk-low-soft: rgba(117, 118, 126, 0.18);
+    --success: #6fc690;
+    --success-soft: rgba(111, 198, 144, 0.12);
+
+    --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+    --backdrop: rgba(0, 0, 0, 0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: var(--text-md) / 1.5 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ol,
+ul {
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: default;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+kbd {
+  padding: 0 var(--space-1);
+  border: var(--hairline);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+input[type='text'],
+input[type='password'],
+input[type='search'],
+textarea,
+select {
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition:
+    border-color var(--duration) var(--ease-out),
+    box-shadow var(--duration) var(--ease-out);
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
+  margin: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+::placeholder {
+  color: var(--text-tertiary);
+}
+
+::selection {
+  background: var(--accent-soft);
+}
