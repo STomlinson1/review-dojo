@@ -205,11 +205,20 @@ export interface ChatMessage {
   createdAt: string
 }
 
+export interface PreviousReview {
+  headSha: string
+  /** Files whose changes differ from what the reviewer saw, including files added to or dropped from the PR. */
+  changedPaths: string[]
+  carriedDrafts: number
+}
+
 export interface ReviewState {
   pr: PrRef
   headSha: string
-  /** Set when drafts were carried over from review of an earlier head commit. */
-  carriedFromSha: string | null
+  /** The reviewer's last review of an earlier head commit of this PR, if any. */
+  previous: PreviousReview | null
+  /** Content hash of each file's changes, so a later push can be compared with what was reviewed. */
+  fileDigests: Record<string, string>
   visitedStopIds: string[]
   stops: Record<string, StopProgress>
   drafts: DraftComment[]
@@ -218,12 +227,53 @@ export interface ReviewState {
   submittedReviewUrl: string | null
 }
 
+export interface ThreadComment {
+  author: string
+  body: string
+  createdAt: string
+  url: string
+}
+
+/** A GitHub review thread. `line` is null once the thread no longer maps onto the current diff. */
+export interface ReviewThread {
+  id: string
+  path: string
+  side: DiffSide
+  line: number | null
+  startLine: number | null
+  isResolved: boolean
+  isOutdated: boolean
+  comments: ThreadComment[]
+}
+
+export interface TeamLesson {
+  title: string
+  detail: string
+  examples: string[]
+}
+
+/** Recurring expectations distilled from a repository's past review comments. */
+export interface TeamLessons {
+  generatedAt: string
+  sourceCount: number
+  lessons: TeamLesson[]
+}
+
+export interface RecentReview {
+  ref: PrRef
+  url: string
+  title: string
+  openedAt: string
+}
+
 export interface PrSession {
   pr: PullRequest
   stack: Stack
   diff: Diff
   tour: TourRecord | null
   review: ReviewState
+  threads: ReviewThread[]
+  lessons: TeamLessons | null
 }
 
 export type AuthMode = 'apiKey' | 'subscription'
@@ -269,6 +319,7 @@ export interface DojoApi {
   setApiKey(provider: ProviderId, key: string | null): Promise<void>
 
   listReviewRequests(): Promise<PrSummary[]>
+  recentReviews(): Promise<RecentReview[]>
   openPullRequest(url: string, taskId: string): Promise<PrSession>
   generateTour(pr: PrRef, taskId: string): Promise<TourRecord>
   ask(pr: PrRef, stopId: string | null, question: string, taskId: string): Promise<ChatMessage>
@@ -278,6 +329,7 @@ export interface DojoApi {
 
   saveReview(review: ReviewState): Promise<void>
   submitReview(review: ReviewState, event: ReviewEvent): Promise<string>
+  refreshLessons(pr: PrRef, taskId: string): Promise<TeamLessons>
   readFile(pr: PrRef, path: string, version: 'base' | 'head'): Promise<string | null>
   resolvePath(pr: PrRef, path: string): Promise<string | null>
   openExternal(url: string): Promise<void>

@@ -1,4 +1,14 @@
-import type { DraftComment, PrRef, PrSummary, PullRequest, ReviewEvent, Stack, StackEntry } from '../shared/types'
+import type {
+  DiffSide,
+  DraftComment,
+  PrRef,
+  PrSummary,
+  PullRequest,
+  ReviewEvent,
+  ReviewThread,
+  Stack,
+  StackEntry,
+} from '../shared/types'
 import { CommandError, run } from './exec'
 import { detectStack } from './stack'
 
@@ -227,4 +237,104 @@ export async function submitReview(
     }
     throw error
   }
+}
+
+const THREADS_QUERY = `query($owner: String!, $repo: String!, $number: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $endCursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id path line startLine diffSide isResolved isOutdated
+          comments(first: 50) { nodes { author { login } body createdAt url } }
+        }
+      }
+    }
+  }
+}`
+
+interface ThreadsPage {
+  data: {
+    repository: {
+      pullRequest: {
+        reviewThreads: {
+          nodes: {
+            id: string
+            path: string
+            line: number | null
+            startLine: number | null
+            diffSide: DiffSide
+            isResolved: boolean
+            isOutdated: boolean
+            comments: { nodes: { author: { login: string } | null; body: string; createdAt: string; url: string }[] }
+          }[]
+        }
+      }
+    }
+  }
+}
+
+export async function fetchThreads(ref: PrRef): Promise<ReviewThread[]> {
+  const pages = await gh<ThreadsPage[]>([
+    'api',
+    'graphql',
+    '--paginate',
+    '--slurp',
+    '-f',
+    `query=${THREADS_QUERY}`,
+    '-F',
+    `owner=${ref.owner}`,
+    '-F',
+    `repo=${ref.repo}`,
+    '-F',
+    `number=${ref.number}`,
+  ])
+  return pages.flatMap((page) =>
+    page.data.repository.pullRequest.reviewThreads.nodes.map((thread) => ({
+      id: thread.id,
+      path: thread.path,
+      side: thread.diffSide,
+      line: thread.line,
+      startLine: thread.startLine,
+      isResolved: thread.isResolved,
+      isOutdated: thread.isOutdated,
+      comments: thread.comments.nodes.map((comment) => ({
+        author: comment.author?.login ?? 'ghost',
+        body: comment.body,
+        createdAt: comment.createdAt,
+        url: comment.url,
+      })),
+    })),
+  )
+}
+
+export interface PastReviewComment {
+  path: string
+  body: string
+  diffHunk: string
+  url: string
+}
+
+/** The repository's most recent human review comments, newest first. */
+export async function fetchPastReviewComments(ref: PrRef, pages: number): Promise<PastReviewComment[]> {
+  const batches = await Promise.all(
+    Array.from({ length: pages }, (_, index) =>
+      gh<
+        {
+          path: string
+          body: string
+          diff_hunk: string
+          html_url: string
+          user: { login: string; type: string } | null
+        }[]
+      >([
+        'api',
+        `repos/${ref.owner}/${ref.repo}/pulls/comments?sort=created&direction=desc&per_page=100&page=${index + 1}`,
+      ]),
+    ),
+  )
+  return batches
+    .flat()
+    .filter((comment) => comment.user?.type === 'User' && comment.body.trim().length >= 40)
+    .map((comment) => ({ path: comment.path, body: comment.body, diffHunk: comment.diff_hunk, url: comment.html_url }))
 }

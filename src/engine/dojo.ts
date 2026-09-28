@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
-import { z } from 'zod'
 import { findStop } from '../shared/tour'
 import type {
   AgentEvent,
@@ -8,25 +7,31 @@ import type {
   Diff,
   DraftComment,
   PrRef,
+  PreviousReview,
   PrSession,
   ProviderId,
   PullRequest,
+  RecentReview,
   ReviewEvent,
   ReviewState,
+  ReviewThread,
   Stack,
   Stop,
+  TeamLessons,
   TourRecord,
 } from '../shared/types'
 import { run } from './exec'
 import { Workspace } from './git'
-import { fetchPullRequest, fetchStack, parsePrRef, submitReview } from './github'
-import { parseModelJson } from './json'
+import { changedPaths, fileDigests } from './digest'
+import { fetchPullRequest, fetchStack, fetchThreads, parsePrRef, submitReview } from './github'
+import { parseStructured } from './json'
+import { LESSONS_MAX_AGE_MS, learnLessons } from './lessons'
 import { resolveInside } from './paths'
 import { askPrompt, gradePrompt, polishPrompt, sessionSeedPrompt, tourPrompt, tourRepairPrompt } from './prompts'
 import type { Provider } from './providers/provider'
 import { draftProblem, lineOnSide } from '../shared/review'
 import { Store } from './store'
-import { normalizeTour, rawTourSchema, tourJsonSchema, type RawTour } from './tour'
+import { normalizeTour, rawTourSchema, tourJsonSchema } from './tour'
 
 interface Conversation {
   sessionId: string | null
@@ -40,6 +45,9 @@ interface OpenPr {
   diff: Diff
   worktree: string
   tour: TourRecord | null
+  threads: ReviewThread[]
+  lessons: TeamLessons | null
+  previous: PreviousReview | null
   conversations: Partial<Record<ProviderId, Conversation>>
 }
 
@@ -70,28 +78,56 @@ export class Dojo {
       fetchStack(pr),
       this.workspace.prepare(pr, task.signal, onStep),
     ])
-    const [tour, review] = await Promise.all([
+    const [tour, saved, threads, lessons] = await Promise.all([
       this.store.latestTour(ref, pr.headSha),
       this.store.loadReview(ref, pr.headSha),
+      fetchThreads(ref).catch(() => []),
+      this.store.loadLessons(ref),
     ])
-    this.open.set(refKey(ref), { pr, stack, diff, worktree, tour, conversations: {} })
-    return { pr, stack, diff, tour, review }
+    const review = saved ?? (await this.freshReview(pr, diff))
+    this.store.recordOpened(pr)
+    this.open.set(refKey(ref), {
+      pr,
+      stack,
+      diff,
+      worktree,
+      tour,
+      threads,
+      lessons,
+      previous: review.previous,
+      conversations: {},
+    })
+    return { pr, stack, diff, tour, review, threads, lessons }
+  }
+
+  recentReviews(): Promise<RecentReview[]> {
+    return this.store.recentReviews(20)
+  }
+
+  async refreshLessons(ref: PrRef, provider: Provider, task: TaskContext): Promise<TeamLessons> {
+    const session = this.session(ref)
+    const lessons = await learnLessons(ref, provider, session.worktree, task)
+    this.store.saveLessons(ref, lessons)
+    session.lessons = lessons
+    return lessons
   }
 
   async generateTour(ref: PrRef, provider: Provider, task: TaskContext): Promise<TourRecord> {
     const session = this.session(ref)
+    const lessons = await this.currentLessons(ref, provider, task)
     task.onEvent({ kind: 'step', text: `Exploring the repository with ${provider.id}` })
     const request = { cwd: session.worktree, schema: tourJsonSchema, tools: 'repo' as const, ...task }
+    const context = { lessons, threads: session.threads, previous: session.previous }
     let result = await provider.run({
       ...request,
-      prompt: tourPrompt(session.pr, session.stack, session.diff),
+      prompt: tourPrompt(session.pr, session.stack, session.diff, context),
       resume: null,
     })
-    let parsed = parseTour(result.text)
+    let parsed = parseStructured(result.text, rawTourSchema)
     if (!parsed.success && result.sessionId) {
       task.onEvent({ kind: 'step', text: 'Correcting the tour format' })
       result = await provider.run({ ...request, prompt: tourRepairPrompt(parsed.error), resume: result.sessionId })
-      parsed = parseTour(result.text)
+      parsed = parseStructured(result.text, rawTourSchema)
     }
     if (!parsed.success) throw new Error(`The ${provider.id} agent returned an unusable tour: ${parsed.error}`)
 
@@ -103,7 +139,7 @@ export class Dojo {
       sessionId: result.sessionId,
       createdAt: new Date().toISOString(),
       usage: result.usage,
-      tour: normalizeTour(parsed.tour, session.diff),
+      tour: normalizeTour(parsed.data, session.diff),
     }
     this.store.saveTour(record)
     session.tour = record
@@ -183,6 +219,50 @@ export class Dojo {
     return matches.length === 1 ? matches[0] : null
   }
 
+  /** Lessons are context, not a prerequisite: failing to learn them never blocks a tour. */
+  private async currentLessons(ref: PrRef, provider: Provider, task: TaskContext): Promise<TeamLessons | null> {
+    const cached = this.session(ref).lessons
+    if (cached && Date.now() - Date.parse(cached.generatedAt) < LESSONS_MAX_AGE_MS) return cached
+    try {
+      return await this.refreshLessons(ref, provider, task)
+    } catch (error) {
+      task.signal.throwIfAborted()
+      task.onEvent({
+        kind: 'step',
+        text: `Skipped team review lessons: ${error instanceof Error ? error.message : error}`,
+      })
+      return cached
+    }
+  }
+
+  /**
+   * A new push starts a fresh review. Unsent drafts from the reviewer's latest earlier review carry
+   * over, and the files whose changes differ from what they saw are recorded.
+   */
+  private async freshReview(pr: PullRequest, diff: Diff): Promise<ReviewState> {
+    const digests = fileDigests(diff)
+    const prior = await this.store.latestOtherReview(pr.ref, pr.headSha)
+    const drafts = prior?.drafts.map((draft) => ({ ...draft, stopId: null })) ?? []
+    return {
+      pr: pr.ref,
+      headSha: pr.headSha,
+      previous: prior
+        ? {
+            headSha: prior.headSha,
+            changedPaths: changedPaths(prior.fileDigests, digests),
+            carriedDrafts: drafts.length,
+          }
+        : null,
+      fileDigests: digests,
+      visitedStopIds: [],
+      stops: {},
+      drafts,
+      chat: [],
+      body: prior?.body ?? '',
+      submittedReviewUrl: null,
+    }
+  }
+
   /** Follow-ups resume the tour's agent session so answers draw on everything it already explored. */
   private converse(
     ref: PrRef,
@@ -235,17 +315,6 @@ export class Dojo {
     const found = tour ? findStop(tour, stopId) : null
     if (!found) throw new Error(`Unknown stop ${stopId}.`)
     return found.stop
-  }
-}
-
-function parseTour(text: string): { success: true; tour: RawTour } | { success: false; error: string } {
-  try {
-    const result = rawTourSchema.safeParse(parseModelJson(text))
-    return result.success
-      ? { success: true, tour: result.data }
-      : { success: false, error: z.prettifyError(result.error) }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 }
 

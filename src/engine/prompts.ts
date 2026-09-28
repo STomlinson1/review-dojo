@@ -1,5 +1,15 @@
 import { selectHunks } from '../shared/tour'
-import type { Diff, DiffFile, Hunk, PullRequest, Stack, Stop } from '../shared/types'
+import type {
+  Diff,
+  DiffFile,
+  Hunk,
+  PreviousReview,
+  PullRequest,
+  ReviewThread,
+  Stack,
+  Stop,
+  TeamLessons,
+} from '../shared/types'
 
 const DIFF_BUDGET_CHARS = 240_000
 
@@ -10,18 +20,26 @@ questions a careful reviewer would ask. You are in a read-only checkout of the r
 Never modify files. Dependencies are not installed. Ground every claim in code you have actually
 read, citing \`path:line\`.`
 
-export function tourPrompt(pr: PullRequest, stack: Stack, diff: Diff): string {
+export interface TourContext {
+  lessons: TeamLessons | null
+  threads: ReviewThread[]
+  previous: PreviousReview | null
+}
+
+export function tourPrompt(pr: PullRequest, stack: Stack, diff: Diff, context: TourContext): string {
   return `${AGENT_ROLE}
 
 # Task
 Prepare a guided tour of the pull request below, returned as JSON matching the provided schema.
 
 ## How to work
-1. Read the PR description and linked issues. Extract what the author says the change should do.
-2. Explore the repository around every changed area before writing anything: read the full changed
+1. Read the repository's contributor guidance if present (CONTRIBUTING.md, AGENTS.md, CLAUDE.md,
+   .github/copilot-instructions.md, and docs they point to). Treat it as this team's conventions.
+2. Read the PR description and linked issues. Extract what the author says the change should do.
+3. Explore the repository around every changed area before writing anything: read the full changed
    files, find callers and usages (search), read the relevant types and existing tests, and look for
    existing helpers or patterns that solve the same problem.
-3. Design the tour.
+4. Design the tour.
    - Order chapters by how the change works (entry points, then core logic, then edges such as errors,
      configuration and migrations, then tests), never by file name.
    - A stop groups the hunks that must be understood together; a stop may span files. Keep a stop to
@@ -40,7 +58,8 @@ Prepare a guided tour of the pull request below, returned as JSON matching the p
 - context: code outside the diff the reviewer should read to understand this stop (callers, types,
   tests, the pattern being extended), each with why it matters. Line numbers refer to the PR head.
 - conventions: places where the change departs from how this repository already does the same thing,
-  or duplicates an existing helper. Only include notes backed by precedents you found by searching.
+  duplicates an existing helper, or goes against the contributor guidance or the team review lessons
+  below. Only include notes backed by precedents you found by searching or by a lesson you can cite.
 - question: one question that tests real understanding of behavior (what happens under a specific
   condition, input, or ordering), with an answer grounded in the code. null for trivial stops.
 
@@ -52,9 +71,12 @@ Prepare a guided tour of the pull request below, returned as JSON matching the p
   agent-written, and unrequested changes are a primary review risk.
 
 ## summary
-Two to four sentences: what the PR does, the approach, and where the reviewer's attention matters most.
+Two to four sentences: what the PR does, the approach, and where the reviewer's attention matters most.${
+    context.previous ? ' The reviewer has reviewed an earlier version, so begin with what changed since then.' : ''
+  }
 
 ${prContext(pr, stack)}
+${reviewContext(context)}
 
 # Diff
 Hunks are labeled [H#]. Generated files and lockfiles list their hunk ids but omit bodies.
@@ -125,6 +147,34 @@ ${prContext(pr, stack)}
 
 # Relevant diff
 ${renderDiff(focused)}`
+}
+
+function reviewContext({ lessons, threads, previous }: TourContext): string {
+  const sections: string[] = []
+  if (lessons && lessons.lessons.length > 0) {
+    sections.push(`## Team review lessons
+Distilled from this repository's past review comments. Hold the change to them.
+${lessons.lessons.map((lesson) => `- **${lesson.title}**: ${lesson.detail}`).join('\n')}`)
+  }
+  const open = threads.filter((thread) => !thread.isResolved && thread.comments.length > 0)
+  if (open.length > 0) {
+    sections.push(`## Open review discussion
+Unresolved threads already on this PR. Don't repeat them as new findings; mention one in a stop when it is
+relevant to understanding that stop.
+${open
+  .map((thread) => {
+    const [first] = thread.comments
+    const where = thread.line === null ? `${thread.path} (outdated)` : `${thread.path}:${thread.line}`
+    return `- ${where}, ${first.author}: ${first.body.replace(/\s+/g, ' ').slice(0, 240)}`
+  })
+  .join('\n')}`)
+  }
+  if (previous) {
+    sections.push(`## Since the reviewer's last review
+They reviewed an earlier head (${previous.headSha.slice(0, 7)}). Files whose changes differ since then:
+${previous.changedPaths.length > 0 ? previous.changedPaths.map((path) => `- ${path}`).join('\n') : '- none'}`)
+  }
+  return sections.join('\n\n')
 }
 
 function prContext(pr: PullRequest, stack: Stack): string {

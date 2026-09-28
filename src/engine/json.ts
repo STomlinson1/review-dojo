@@ -1,3 +1,5 @@
+import { type ZodType, z } from 'zod'
+
 const VALID_ESCAPE = /["\\/bfnrtu]/
 
 /**
@@ -40,4 +42,17 @@ function repairStrings(json: string): string {
     else output += char
   }
   return output
+}
+
+export type Parsed<T> = { success: true; data: T } | { success: false; error: string }
+
+export function parseStructured<T>(text: string, schema: ZodType<T>): Parsed<T> {
+  try {
+    const result = schema.safeParse(parseModelJson(text))
+    return result.success
+      ? { success: true, data: result.data }
+      : { success: false, error: z.prettifyError(result.error) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
 }

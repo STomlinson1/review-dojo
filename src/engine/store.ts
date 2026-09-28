@@ -2,7 +2,15 @@ import { readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { readJson, writeJson } from './jsonFile'
 import { PROVIDER_IDS } from '../shared/providers'
-import type { PrRef, ProviderId, ReviewState, TourRecord } from '../shared/types'
+import type {
+  PrRef,
+  ProviderId,
+  PullRequest,
+  RecentReview,
+  ReviewState,
+  TeamLessons,
+  TourRecord,
+} from '../shared/types'
 
 export class Store {
   constructor(private readonly dataDir: string) {}
@@ -22,39 +30,15 @@ export class Store {
     writeJson(this.tourPath(record.pr, record.headSha, record.provider), record)
   }
 
-  /**
-   * A new push starts a fresh review, but unsent drafts from the latest earlier head carry over
-   * (flagged by `carriedFromSha`) rather than silently disappearing.
-   */
-  async loadReview(ref: PrRef, headSha: string): Promise<ReviewState> {
-    const saved = await readJson<ReviewState>(this.reviewPath(ref, headSha))
-    if (saved) return saved
-    const fresh: ReviewState = {
-      pr: ref,
-      headSha,
-      carriedFromSha: null,
-      visitedStopIds: [],
-      stops: {},
-      drafts: [],
-      chat: [],
-      body: '',
-      submittedReviewUrl: null,
-    }
-    const previous = await this.latestOtherReview(ref, headSha)
-    if (!previous || (previous.drafts.length === 0 && !previous.body.trim())) return fresh
-    return {
-      ...fresh,
-      carriedFromSha: previous.headSha,
-      drafts: previous.drafts.map((draft) => ({ ...draft, stopId: null })),
-      body: previous.body,
-    }
+  loadReview(ref: PrRef, headSha: string): Promise<ReviewState | null> {
+    return readJson<ReviewState>(this.reviewPath(ref, headSha))
   }
 
   saveReview(state: ReviewState): void {
     writeJson(this.reviewPath(state.pr, state.headSha), state)
   }
 
-  private async latestOtherReview(ref: PrRef, headSha: string): Promise<ReviewState | null> {
+  async latestOtherReview(ref: PrRef, headSha: string): Promise<ReviewState | null> {
     const names = await readdir(this.prDir(ref)).catch(() => [])
     const candidates = await Promise.all(
       names
@@ -65,8 +49,48 @@ export class Store {
     return latest ? readJson<ReviewState>(join(this.prDir(ref), latest.name)) : null
   }
 
+  loadLessons(ref: PrRef): Promise<TeamLessons | null> {
+    return readJson<TeamLessons>(join(this.repoDir(ref), 'lessons.json'))
+  }
+
+  saveLessons(ref: PrRef, lessons: TeamLessons): void {
+    writeJson(join(this.repoDir(ref), 'lessons.json'), lessons)
+  }
+
+  recordOpened(pr: PullRequest): void {
+    const entry: RecentReview = { ref: pr.ref, url: pr.url, title: pr.title, openedAt: new Date().toISOString() }
+    writeJson(join(this.prDir(pr.ref), 'opened.json'), entry)
+  }
+
+  async recentReviews(limit: number): Promise<RecentReview[]> {
+    const root = join(this.dataDir, 'reviews')
+    const owners = await readdir(root).catch(() => [])
+    const entries = await Promise.all(
+      owners.flatMap(async (owner) =>
+        Promise.all(
+          (await readdir(join(root, owner)).catch(() => [])).map(async (repo) =>
+            Promise.all(
+              (await readdir(join(root, owner, repo)).catch(() => [])).map((number) =>
+                readJson<RecentReview>(join(root, owner, repo, number, 'opened.json')).catch(() => null),
+              ),
+            ),
+          ),
+        ),
+      ),
+    )
+    return entries
+      .flat(2)
+      .filter((entry): entry is RecentReview => entry !== null)
+      .sort((a, b) => b.openedAt.localeCompare(a.openedAt))
+      .slice(0, limit)
+  }
+
+  private repoDir(ref: PrRef): string {
+    return join(this.dataDir, 'reviews', ref.owner, ref.repo)
+  }
+
   private prDir(ref: PrRef): string {
-    return join(this.dataDir, 'reviews', ref.owner, ref.repo, String(ref.number))
+    return join(this.repoDir(ref), String(ref.number))
   }
 
   private tourPath(ref: PrRef, headSha: string, provider: ProviderId): string {

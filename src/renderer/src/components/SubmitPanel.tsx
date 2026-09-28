@@ -118,10 +118,10 @@ export function SubmitPanel({ onClose }: { onClose(): void }) {
           </div>
         ) : null}
 
-        {review.carriedFromSha && review.drafts.length > 0 ? (
+        {review.previous && review.previous.carriedDrafts > 0 && review.drafts.length > 0 ? (
           <section className={styles.coverage} aria-labelledby="carried-heading">
             <h3 id="carried-heading" className={styles.coverageTitle}>
-              These drafts were written against an earlier commit ({review.carriedFromSha.slice(0, 7)})
+              These drafts were written against an earlier commit ({review.previous.headSha.slice(0, 7)})
             </h3>
             <p>The pull request has new commits since. Check that each comment still sits on the line you meant.</p>
           </section>

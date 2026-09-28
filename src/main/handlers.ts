@@ -46,6 +46,7 @@ export function createHandlers(dojo: Dojo, settings: SettingsStore, emit: (event
     setApiKey: (id, key) => settings.setApiKey(id, key),
 
     listReviewRequests: () => listReviewRequests(),
+    recentReviews: () => dojo.recentReviews(),
     openPullRequest: (url, taskId) => task(taskId, (context) => dojo.openPullRequest(url, context)),
     generateTour: (ref, taskId) => task(taskId, async (context) => dojo.generateTour(ref, await provider(), context)),
     ask: (ref, stopId, question, taskId) =>
@@ -60,6 +61,8 @@ export function createHandlers(dojo: Dojo, settings: SettingsStore, emit: (event
 
     saveReview: async (review) => dojo.saveReview(review),
     submitReview: (review, event) => dojo.submitReview(review, event),
+    refreshLessons: (ref, taskId) =>
+      task(taskId, async (context) => dojo.refreshLessons(ref, await provider(), context)),
     readFile: (ref, path, version) => dojo.readFile(ref, path, version),
     resolvePath: (ref, path) => dojo.resolvePath(ref, path),
     async openExternal(url) {
