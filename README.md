@@ -13,11 +13,23 @@ the diff into a guided tour:
 - **Intent check.** What the PR claims to do, whether it does it, and which changes nothing in the
   description justifies, the scope creep that agent-written PRs are prone to.
 - **Convention radar.** Places where the change departs from how the repository already solves the
-  same problem, with precedents.
+  same problem, with precedents, including its contributor guidance (CONTRIBUTING, AGENTS.md,
+  CLAUDE.md).
+- **Team review lessons.** Recurring expectations distilled from the repository's own past review
+  comments ("use the shared test utilities", "fix bundler issues upstream"), cached per repository and
+  applied to every tour.
 - **Specific checks and a comprehension question per stop.** Dojo mode hides the analysis until you
   commit to your own reading, then grades it and names your blind spots.
-- **Ask about the current stop.** Follow-ups resume the agent session that built the tour, so answers
-  draw on everything it already explored.
+- **Side by side.** The whole PR diff next to the narration, every hunk labeled with the stop that
+  explains it; selecting a stop scrolls to it, and scrolling shows which stop you're reading.
+- **Readable while it's written.** Stops appear as soon as the agent finishes writing them.
+- **Ask about the current stop or selected lines.** Follow-ups resume the agent session that built the
+  tour, so answers draw on everything it already explored, and stream in as they're written.
+- **Existing discussion inline.** GitHub review threads appear in the diff, and the tour avoids
+  repeating what reviewers already raised.
+- **What changed since your last review.** When the author pushes again, the files whose changes
+  differ from what you saw are flagged, and unsent drafts carry over.
+- **Shareable.** Copy the tour as a Markdown reviewer's guide.
 - **You stay the author.** Draft comments on diff lines, optionally polish them, and submit them as a
   pending GitHub review that you finalize on GitHub.
 - **Stack-aware.** Uses GitHub's native stacked PRs when present, otherwise reconstructs the stack

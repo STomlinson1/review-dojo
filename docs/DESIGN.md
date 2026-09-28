@@ -36,11 +36,16 @@ src/renderer   React UI.
    worktree at the head SHA.
 3. Diff `merge-base(base, head)..head` (what GitHub shows), parse into files and hunks with
    stable ids.
-4. Provider agent runs in the worktree with read-only tools and returns a `Tour` (JSON schema).
-5. Engine normalizes the tour against the diff (drops unknown hunk ids, dedupes, appends
+4. Before the first tour of a repository (and every 14 days), the provider distills team review
+   lessons from its recent review comments. The tour prompt carries those lessons, open review
+   threads, and the files changed since the reviewer's last review of the PR.
+5. Provider agent runs in the worktree with read-only tools and returns a `Tour` (JSON schema). The
+   JSON streams; the engine closes the truncated document and previews every fully written stop.
+6. Engine normalizes the tour against the diff (drops unknown hunk ids, dedupes, appends
    uncovered hunks) and caches it by head SHA + provider.
-6. Follow-up questions resume the same agent session.
-7. Drafted comments become one pending review via `gh api`.
+7. Follow-up questions resume the same agent session and stream their answers.
+8. Drafted comments become one pending review via `gh api`. Each review records a content digest per
+   file, so a later push can report exactly which files changed since the reviewer looked.
 
 ### Providers
 
