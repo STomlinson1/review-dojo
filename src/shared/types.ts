@@ -262,7 +262,7 @@ export interface ProgressEvent extends AgentEvent {
   taskId: string
 }
 
-export interface DocentApi {
+export interface DojoApi {
   environment(): Promise<EnvironmentStatus>
   getSettings(): Promise<Settings>
   saveSettings(settings: Settings): Promise<void>

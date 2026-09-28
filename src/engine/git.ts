@@ -43,7 +43,7 @@ export class Workspace {
     }
 
     onStep('Fetching pull request commits')
-    const refs = `refs/docent/${pr.ref.number}`
+    const refs = `refs/dojo/${pr.ref.number}`
     await git(
       clone,
       ['fetch', '--no-tags', 'origin', `+${pr.baseSha}:${refs}/base`, `+${pr.headSha}:${refs}/head`],

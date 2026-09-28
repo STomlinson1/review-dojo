@@ -1,6 +1,6 @@
 import { File, type FileOptions } from '@pierre/diffs/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { docent, errorMessage } from '../api'
+import { dojo, errorMessage } from '../api'
 import { formatLocation } from '../lib/codeRefs'
 import { type PeekTarget, useSession } from '../store'
 import { Button } from './Button'
@@ -23,10 +23,10 @@ export function CodePeek({ target, onClose }: { target: PeekTarget; onClose(): v
 
   useEffect(() => {
     let current = true
-    docent
+    dojo
       .resolvePath(pr.ref, target.path)
       .then(async (path) => {
-        const text = path === null ? null : await docent.readFile(pr.ref, path, 'head')
+        const text = path === null ? null : await dojo.readFile(pr.ref, path, 'head')
         if (!current) return
         setContents(path === null || text === null ? { status: 'missing' } : { status: 'ready', path, text })
       })
@@ -67,7 +67,7 @@ export function CodePeek({ target, onClose }: { target: PeekTarget; onClose(): v
       subtitle="At the pull request's head"
       onClose={onClose}
       actions={
-        <Button size="sm" variant="ghost" onClick={() => void docent.openExternal(githubUrl)}>
+        <Button size="sm" variant="ghost" onClick={() => void dojo.openExternal(githubUrl)}>
           <ExternalIcon />
           GitHub
         </Button>

@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import MarkdownRenderer, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { docent } from '../api'
+import { dojo } from '../api'
 import { parseCodeRef } from '../lib/codeRefs'
-import { useDocent } from '../store'
+import { useDojo } from '../store'
 import styles from './Markdown.module.css'
 
 /** Titles render inside buttons, where the Markdown renderer's block elements would be invalid HTML. */
@@ -27,7 +27,7 @@ interface MarkdownProps {
 }
 
 export function Markdown({ children, inline = false }: MarkdownProps) {
-  const { setOverlay } = useDocent.getState()
+  const { setOverlay } = useDojo.getState()
 
   const components = useMemo<Components>(
     () => ({
@@ -36,7 +36,7 @@ export function Markdown({ children, inline = false }: MarkdownProps) {
           href={href}
           onClick={(event) => {
             event.preventDefault()
-            if (href && /^https?:\/\//.test(href)) void docent.openExternal(href)
+            if (href && /^https?:\/\//.test(href)) void dojo.openExternal(href)
           }}
         >
           {label}

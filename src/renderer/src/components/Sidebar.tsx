@@ -1,4 +1,4 @@
-import { useDocent, useSession } from '../store'
+import { useDojo, useSession } from '../store'
 import { CheckIcon } from './icons'
 import { RiskDot } from './Risk'
 import { InlineCode } from './Markdown'
@@ -6,8 +6,8 @@ import styles from './Sidebar.module.css'
 
 export function Sidebar() {
   const { tour, review } = useSession()
-  const selectedStopId = useDocent((state) => state.selectedStopId)
-  const { select } = useDocent.getState()
+  const selectedStopId = useDojo((state) => state.selectedStopId)
+  const { select } = useDojo.getState()
   if (!tour) return null
 
   return (

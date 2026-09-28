@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 
-const MARKER = '__DOCENT_PATH__'
+const MARKER = '__DOJO_PATH__'
 
 /**
  * Apps launched from Finder get a minimal PATH without Homebrew, so `gh` and `git` would not

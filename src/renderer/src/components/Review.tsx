@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useDocent } from '../store'
+import { useDojo } from '../store'
 import { AskPanel } from './AskPanel'
 import { Button } from './Button'
 import { Overview } from './Overview'
@@ -10,9 +10,9 @@ import { TopBar } from './TopBar'
 import { TourEmpty } from './TourEmpty'
 
 export function Review() {
-  const hasTour = useDocent((state) => state.session?.tour != null)
-  const selectedStopId = useDocent((state) => state.selectedStopId)
-  const askOpen = useDocent((state) => state.askOpen)
+  const hasTour = useDojo((state) => state.session?.tour != null)
+  const selectedStopId = useDojo((state) => state.selectedStopId)
+  const askOpen = useDojo((state) => state.askOpen)
   const mainRef = useRef<HTMLElement>(null)
 
   useShortcuts()
@@ -42,10 +42,10 @@ export function Review() {
 }
 
 function StatusBanner() {
-  const opening = useDocent((state) => state.tasks.open)
-  const openError = useDocent((state) => state.errors.open)
-  const saveError = useDocent((state) => state.saveError)
-  const { cancelTask, dismissError } = useDocent.getState()
+  const opening = useDojo((state) => state.tasks.open)
+  const openError = useDojo((state) => state.errors.open)
+  const saveError = useDojo((state) => state.saveError)
+  const { cancelTask, dismissError } = useDojo.getState()
 
   if (opening) {
     const latest = opening.events.at(-1)?.text
@@ -84,7 +84,7 @@ function useShortcuts() {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.metaKey || event.ctrlKey || event.altKey || isEditable(event.target)) return
-      const state = useDocent.getState()
+      const state = useDojo.getState()
       if (state.overlay) return
       const stopId = state.selectedStopId
       if (!state.session?.tour) return

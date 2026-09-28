@@ -1,17 +1,17 @@
 import { Fragment } from 'react'
 import type { Stack } from '../../../shared/types'
 import { tourStops } from '../../../shared/tour'
-import { useDocent, useSession } from '../store'
+import { useDojo, useSession } from '../store'
 import { Button } from './Button'
 import { AskIcon, BackIcon, SettingsIcon } from './icons'
 import styles from './TopBar.module.css'
 
 export function TopBar() {
   const { pr, stack, tour, review } = useSession()
-  const dojoMode = useDocent((state) => state.dojoMode)
-  const diffStyle = useDocent((state) => state.diffStyle)
-  const askOpen = useDocent((state) => state.askOpen)
-  const { closePullRequest, setDojoMode, setDiffStyle, setAskOpen, setOverlay } = useDocent.getState()
+  const dojoMode = useDojo((state) => state.dojoMode)
+  const diffStyle = useDojo((state) => state.diffStyle)
+  const askOpen = useDojo((state) => state.askOpen)
+  const { closePullRequest, setDojoMode, setDiffStyle, setAskOpen, setOverlay } = useDojo.getState()
   const stops = tour ? tourStops(tour.tour) : []
 
   return (
@@ -113,8 +113,8 @@ function UnderstoodMeter({ understood, total }: { understood: number; total: num
 }
 
 function StackTrail({ stack, current }: { stack: Stack; current: number }) {
-  const opening = useDocent((state) => state.tasks.open !== undefined)
-  const { openPullRequest } = useDocent.getState()
+  const opening = useDojo((state) => state.tasks.open !== undefined)
+  const { openPullRequest } = useDojo.getState()
 
   return (
     <nav className={styles.stack} aria-label="Stacked pull requests">

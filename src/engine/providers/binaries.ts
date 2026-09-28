@@ -16,7 +16,7 @@ export function claudeBinary(): string {
 
 export function codexVendorDir(): string {
   const triple = DARWIN_TRIPLES[process.arch]
-  if (process.platform !== 'darwin' || !triple) throw new Error('Docent currently supports macOS only.')
+  if (process.platform !== 'darwin' || !triple) throw new Error('Review Dojo currently supports macOS only.')
   const manifest = require.resolve(`@openai/codex-${process.platform}-${process.arch}/package.json`)
   return unpacked(join(dirname(manifest), 'vendor', triple))
 }

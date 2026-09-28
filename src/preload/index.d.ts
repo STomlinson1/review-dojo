@@ -1,7 +1,7 @@
-import type { DocentApi } from '../shared/types'
+import type { DojoApi } from '../shared/types'
 
 declare global {
   interface Window {
-    docent: DocentApi
+    dojo: DojoApi
   }
 }

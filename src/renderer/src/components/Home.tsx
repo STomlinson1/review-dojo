@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PROVIDER_NAMES } from '../../../shared/providers'
 import type { PrSummary } from '../../../shared/types'
-import { docent, errorMessage } from '../api'
+import { dojo, errorMessage } from '../api'
 import { relativeTime } from '../lib/format'
-import { useDocent } from '../store'
+import { useDojo } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
@@ -13,9 +13,9 @@ type ReviewRequests =
   { status: 'loading' } | { status: 'ready'; items: PrSummary[] } | { status: 'error'; message: string }
 
 export function Home() {
-  const opening = useDocent((state) => state.tasks.open)
-  const openError = useDocent((state) => state.errors.open)
-  const { openPullRequest, cancelTask } = useDocent.getState()
+  const opening = useDojo((state) => state.tasks.open)
+  const openError = useDojo((state) => state.errors.open)
+  const { openPullRequest, cancelTask } = useDojo.getState()
   const [input, setInput] = useState('')
 
   return (
@@ -23,7 +23,7 @@ export function Home() {
       <div className={styles.dragRegion} />
       <main className={styles.column}>
         <header>
-          <h1 className={styles.wordmark}>Docent</h1>
+          <h1 className={styles.wordmark}>Review Dojo</h1>
           <p className={styles.tagline}>Understand a pull request before you judge it.</p>
         </header>
 
@@ -69,10 +69,10 @@ export function Home() {
 }
 
 function SetupStatus() {
-  const environment = useDocent((state) => state.environment)
-  const environmentError = useDocent((state) => state.environmentError)
-  const provider = useDocent((state) => state.settings?.provider ?? 'claude')
-  const { refreshEnvironment, setOverlay } = useDocent.getState()
+  const environment = useDojo((state) => state.environment)
+  const environmentError = useDojo((state) => state.environmentError)
+  const provider = useDojo((state) => state.settings?.provider ?? 'claude')
+  const { refreshEnvironment, setOverlay } = useDojo.getState()
 
   if (environmentError) {
     return (
@@ -123,7 +123,7 @@ function ReviewRequestList({ disabled, onOpen }: { disabled: boolean; onOpen(url
 
   const load = useCallback(() => {
     setRequests({ status: 'loading' })
-    docent.listReviewRequests().then(
+    dojo.listReviewRequests().then(
       (items) => setRequests({ status: 'ready', items }),
       (error: unknown) => setRequests({ status: 'error', message: errorMessage(error) }),
     )

@@ -8,7 +8,7 @@ let root = ''
 let outside = ''
 
 beforeAll(async () => {
-  const base = await mkdtemp(join(tmpdir(), 'docent-paths-'))
+  const base = await mkdtemp(join(tmpdir(), 'dojo-paths-'))
   root = join(base, 'repo')
   outside = join(base, 'secret.txt')
   await mkdir(join(root, 'src'), { recursive: true })

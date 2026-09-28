@@ -50,7 +50,7 @@ export interface TaskContext {
 
 const refKey = (ref: PrRef) => `${ref.owner}/${ref.repo}#${ref.number}`
 
-export class Docent {
+export class Dojo {
   private readonly store: Store
   private readonly workspace: Workspace
   private readonly open = new Map<string, OpenPr>()

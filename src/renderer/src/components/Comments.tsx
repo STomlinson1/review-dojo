@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { DraftComment } from '../../../shared/types'
 import { lineLabel } from '../lib/comments'
-import { useDocent } from '../store'
+import { useDojo } from '../store'
 import { Button } from './Button'
 import styles from './Comments.module.css'
 import { Markdown } from './Markdown'
@@ -65,7 +65,7 @@ export function CommentForm({ label, note, initialBody = '', submitLabel, onSubm
 
 export function DraftCard({ draft }: { draft: DraftComment }) {
   const [editing, setEditing] = useState(false)
-  const { updateDraft, deleteDraft } = useDocent.getState()
+  const { updateDraft, deleteDraft } = useDojo.getState()
 
   if (editing) {
     return (

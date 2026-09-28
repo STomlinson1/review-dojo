@@ -13,7 +13,7 @@ function claudeEnv(config: ProviderConfig): Record<string, string | undefined> {
   const { ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, CLAUDE_CODE_OAUTH_TOKEN, ...base } = process.env
   return {
     ...base,
-    CLAUDE_AGENT_SDK_CLIENT_APP: 'docent',
+    CLAUDE_AGENT_SDK_CLIENT_APP: 'review-dojo',
     ...(config.auth === 'apiKey' && config.apiKey ? { ANTHROPIC_API_KEY: config.apiKey } : {}),
   }
 }

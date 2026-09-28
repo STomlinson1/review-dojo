@@ -6,16 +6,16 @@ import { Home } from './components/Home'
 import { Review } from './components/Review'
 import { SettingsModal } from './components/SettingsModal'
 import { SubmitPanel } from './components/SubmitPanel'
-import { flushReview, useDocent } from './store'
+import { flushReview, useDojo } from './store'
 
 export function App() {
-  const ready = useDocent((state) => state.settings !== null)
-  const bootError = useDocent((state) => state.bootError)
-  const hasSession = useDocent((state) => state.session !== null)
-  const overlay = useDocent((state) => state.overlay)
+  const ready = useDojo((state) => state.settings !== null)
+  const bootError = useDojo((state) => state.bootError)
+  const hasSession = useDojo((state) => state.session !== null)
+  const overlay = useDojo((state) => state.overlay)
 
   useEffect(() => {
-    void useDocent.getState().boot()
+    void useDojo.getState().boot()
     const flush = () => void flushReview()
     window.addEventListener('beforeunload', flush)
     return () => window.removeEventListener('beforeunload', flush)
@@ -26,14 +26,14 @@ export function App() {
       <div className={styles.shell}>
         <div className={styles.dragRegion} />
         <div className={styles.center}>
-          <ErrorNote title="Docent couldn't start" message={bootError} />
+          <ErrorNote title="Review Dojo couldn't start" message={bootError} />
         </div>
       </div>
     )
   }
   if (!ready) return <div className={styles.dragRegion} />
 
-  const close = () => useDocent.getState().setOverlay(null)
+  const close = () => useDojo.getState().setOverlay(null)
   return (
     <>
       {hasSession ? <Review /> : <Home />}

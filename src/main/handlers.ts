@@ -1,19 +1,15 @@
 import { shell } from 'electron'
-import { Docent, type TaskContext } from '../engine/docent'
+import { Dojo, type TaskContext } from '../engine/dojo'
 import { currentUser, listReviewRequests } from '../engine/github'
 import { createProvider } from '../engine/providers'
 import type { InvokeMethod } from '../shared/api'
 import { PROVIDER_IDS } from '../shared/providers'
-import type { DocentApi, EnvironmentStatus, ProgressEvent, ProviderId } from '../shared/types'
+import type { DojoApi, EnvironmentStatus, ProgressEvent, ProviderId } from '../shared/types'
 import type { SettingsStore } from './settings'
 
-type Handlers = Pick<DocentApi, InvokeMethod>
+type Handlers = Pick<DojoApi, InvokeMethod>
 
-export function createHandlers(
-  docent: Docent,
-  settings: SettingsStore,
-  emit: (event: ProgressEvent) => void,
-): Handlers {
+export function createHandlers(dojo: Dojo, settings: SettingsStore, emit: (event: ProgressEvent) => void): Handlers {
   const tasks = new Map<string, AbortController>()
 
   async function task<T>(taskId: string, work: (context: TaskContext) => Promise<T>): Promise<T> {
@@ -50,22 +46,22 @@ export function createHandlers(
     setApiKey: (id, key) => settings.setApiKey(id, key),
 
     listReviewRequests: () => listReviewRequests(),
-    openPullRequest: (url, taskId) => task(taskId, (context) => docent.openPullRequest(url, context)),
-    generateTour: (ref, taskId) => task(taskId, async (context) => docent.generateTour(ref, await provider(), context)),
+    openPullRequest: (url, taskId) => task(taskId, (context) => dojo.openPullRequest(url, context)),
+    generateTour: (ref, taskId) => task(taskId, async (context) => dojo.generateTour(ref, await provider(), context)),
     ask: (ref, stopId, question, taskId) =>
-      task(taskId, async (context) => docent.ask(ref, await provider(), stopId, question, context)),
+      task(taskId, async (context) => dojo.ask(ref, await provider(), stopId, question, context)),
     gradePrediction: (ref, stopId, prediction, taskId) =>
-      task(taskId, async (context) => docent.gradePrediction(ref, await provider(), stopId, prediction, context)),
+      task(taskId, async (context) => dojo.gradePrediction(ref, await provider(), stopId, prediction, context)),
     polishComment: (ref, draft, taskId) =>
-      task(taskId, async (context) => docent.polishComment(ref, await provider(), draft, context)),
+      task(taskId, async (context) => dojo.polishComment(ref, await provider(), draft, context)),
     async cancel(taskId) {
       tasks.get(taskId)?.abort()
     },
 
-    saveReview: async (review) => docent.saveReview(review),
-    submitReview: (review, event) => docent.submitReview(review, event),
-    readFile: (ref, path, version) => docent.readFile(ref, path, version),
-    resolvePath: (ref, path) => docent.resolvePath(ref, path),
+    saveReview: async (review) => dojo.saveReview(review),
+    submitReview: (review, event) => dojo.submitReview(review, event),
+    readFile: (ref, path, version) => dojo.readFile(ref, path, version),
+    resolvePath: (ref, path) => dojo.resolvePath(ref, path),
     async openExternal(url) {
       if (new URL(url).protocol !== 'https:') throw new Error('Only https links can be opened.')
       await shell.openExternal(url)

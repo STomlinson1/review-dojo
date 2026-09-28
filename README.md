@@ -1,9 +1,9 @@
-# Docent
+# Review Dojo
 
 A local macOS app that walks you through a GitHub pull request so you actually understand it before
 you review it. Built for the era of agent-written code, where review, not authoring, is the bottleneck.
 
-Docent checks out the PR, lets an agent (Claude or Codex) explore the repository read-only, and turns
+Review Dojo checks out the PR, lets an agent (Claude or Codex) explore the repository read-only, and turns
 the diff into a guided tour:
 
 - **Chapters ordered by how the change works**, not by file name. Each stop groups the hunks you need
@@ -41,7 +41,7 @@ for anything offered to other people.
 ```sh
 npm install
 npm run dev          # development
-npm run package      # builds dist/mac-*/Docent.app (unsigned; drag it to /Applications)
+npm run package      # builds dist/mac-*/Review Dojo.app (unsigned; drag it to /Applications)
 ```
 
 If `npm run dev` reports that Electron failed to install, its download step was skipped; run
@@ -56,7 +56,7 @@ npm run cli -- tour https://github.com/owner/repo/pull/123 --provider claude > t
 ## How it works
 
 See [docs/DESIGN.md](docs/DESIGN.md). Clones, worktrees, tours and review progress live in
-`~/Library/Application Support/Docent`. API keys are encrypted with the macOS keychain.
+`~/Library/Application Support/Review Dojo`. API keys are encrypted with the macOS keychain.
 
 ```sh
 npm test             # unit tests

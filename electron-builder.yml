@@ -1,5 +1,5 @@
-appId: dev.docent.app
-productName: Docent
+appId: dev.reviewdojo.app
+productName: Review Dojo
 directories:
   output: dist
 files:

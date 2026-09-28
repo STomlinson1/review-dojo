@@ -1,5 +1,5 @@
 import { PROVIDER_NAMES } from '../../../shared/providers'
-import { useDocent, useSession } from '../store'
+import { useDojo, useSession } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
@@ -7,11 +7,11 @@ import styles from './TourEmpty.module.css'
 
 export function TourEmpty() {
   const { pr, diff } = useSession()
-  const settings = useDocent((state) => state.settings)
-  const status = useDocent((state) => (settings ? state.environment?.providers[settings.provider] : undefined))
-  const task = useDocent((state) => state.tasks.tour)
-  const error = useDocent((state) => state.errors.tour)
-  const { generateTour, cancelTask, setOverlay } = useDocent.getState()
+  const settings = useDojo((state) => state.settings)
+  const status = useDojo((state) => (settings ? state.environment?.providers[settings.provider] : undefined))
+  const task = useDojo((state) => state.tasks.tour)
+  const error = useDojo((state) => state.errors.tour)
+  const { generateTour, cancelTask, setOverlay } = useDojo.getState()
   if (!settings) return null
 
   const provider = PROVIDER_NAMES[settings.provider]
@@ -33,8 +33,8 @@ export function TourEmpty() {
     <div className={styles.empty}>
       <h1 className={styles.title}>Take the guided tour</h1>
       <p className={styles.lede}>
-        Docent reads this pull request and the code around it, then walks you through it in the order it works, not file
-        by file.
+        Review Dojo reads this pull request and the code around it, then walks you through it in the order it works, not
+        file by file.
       </p>
       <ul className={styles.points}>
         <li>

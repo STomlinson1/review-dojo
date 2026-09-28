@@ -3,7 +3,7 @@ import type { Diff, DiffFile, Hunk, PullRequest, Stack, Stop } from '../shared/t
 
 const DIFF_BUDGET_CHARS = 240_000
 
-const AGENT_ROLE = `You are Docent, a senior engineer guiding a colleague through a pull request review.
+const AGENT_ROLE = `You are a senior engineer guiding a colleague through a pull request review.
 The reviewer is accountable for deeply understanding this change and the codebase patterns it touches.
 Your job is to build that understanding, not to replace it: explain, point at evidence, and ask the
 questions a careful reviewer would ask. You are in a read-only checkout of the repository at the PR head.

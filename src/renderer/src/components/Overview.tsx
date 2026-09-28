@@ -3,7 +3,7 @@ import { PROVIDER_NAMES } from '../../../shared/providers'
 import type { DiffFile, IntentCheck, Stop } from '../../../shared/types'
 import { formatUsage } from '../lib/format'
 import { findHunk, stopForHunk, tourStops } from '../../../shared/tour'
-import { useDocent, useSession } from '../store'
+import { useDojo, useSession } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
@@ -78,9 +78,9 @@ function UntouredFiles({ files }: { files: DiffFile[] }) {
 }
 
 function Regenerate() {
-  const running = useDocent((state) => state.tasks.tour !== undefined)
+  const running = useDojo((state) => state.tasks.tour !== undefined)
   const [confirming, setConfirming] = useState(false)
-  const { generateTour } = useDocent.getState()
+  const { generateTour } = useDojo.getState()
   if (running) return null
 
   if (!confirming) {
@@ -111,9 +111,9 @@ function Regenerate() {
 }
 
 function RegenerationStatus() {
-  const task = useDocent((state) => state.tasks.tour)
-  const error = useDocent((state) => state.errors.tour)
-  const { cancelTask, dismissError } = useDocent.getState()
+  const task = useDojo((state) => state.tasks.tour)
+  const error = useDojo((state) => state.errors.tour)
+  const { cancelTask, dismissError } = useDojo.getState()
 
   if (task) return <ActivityLog task={task} label="Regenerating the tour" onCancel={() => cancelTask('tour')} />
   if (!error) return null
@@ -204,7 +204,7 @@ function IntentSection({ intent }: { intent: IntentCheck }) {
 
 function HunkChip({ hunkId }: { hunkId: string }) {
   const { diff, tour } = useSession()
-  const { select } = useDocent.getState()
+  const { select } = useDojo.getState()
   const hunk = findHunk(diff, hunkId)
   const stop = tour ? stopForHunk(tour.tour, hunkId) : undefined
   const label = hunk ? `${hunk.path.slice(hunk.path.lastIndexOf('/') + 1)}:${hunk.newStart}` : hunkId
@@ -224,7 +224,7 @@ function HunkChip({ hunkId }: { hunkId: string }) {
 
 function RiskMap({ stops }: { stops: Stop[] }) {
   const { review } = useSession()
-  const { select } = useDocent.getState()
+  const { select } = useDojo.getState()
   const risky = [...stops.filter((stop) => stop.risk === 'high'), ...stops.filter((stop) => stop.risk === 'medium')]
 
   return (

@@ -1,6 +1,6 @@
-import type { DocentApi } from './types'
+import type { DojoApi } from './types'
 
-export type InvokeMethod = Exclude<keyof DocentApi, 'onProgress'>
+export type InvokeMethod = Exclude<keyof DojoApi, 'onProgress'>
 
 /** Every request/response method on the bridge; typed as a record so a missing method fails to compile. */
 const INVOKE_METHODS: Record<InvokeMethod, true> = {
@@ -24,6 +24,6 @@ const INVOKE_METHODS: Record<InvokeMethod, true> = {
 
 export const invokeMethods = Object.keys(INVOKE_METHODS) as InvokeMethod[]
 
-export const channel = (method: InvokeMethod) => `docent:${method}`
+export const channel = (method: InvokeMethod) => `dojo:${method}`
 
-export const PROGRESS_CHANNEL = 'docent:progress'
+export const PROGRESS_CHANNEL = 'dojo:progress'

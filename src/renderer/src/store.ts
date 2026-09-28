@@ -13,7 +13,7 @@ import type {
   Settings,
   StopProgress,
 } from '../../shared/types'
-import { docent, errorMessage, startTask } from './api'
+import { dojo, errorMessage, startTask } from './api'
 import { EMPTY_PROGRESS, tourStops } from '../../shared/tour'
 
 export type TaskKey = 'open' | 'tour' | 'ask' | `grade:${string}` | `polish:${string}`
@@ -31,7 +31,7 @@ export type Overlay = { kind: 'settings' } | { kind: 'submit' } | { kind: 'peek'
 
 export type DiffStyle = 'unified' | 'split'
 
-interface DocentState {
+interface DojoState {
   bootError: string | null
   settings: Settings | null
   environment: EnvironmentStatus | null
@@ -49,7 +49,7 @@ interface DocentState {
   polishSuggestions: Partial<Record<string, string>>
 }
 
-interface DocentActions {
+interface DojoActions {
   boot(): Promise<void>
   refreshEnvironment(): Promise<void>
   saveSettings(settings: Settings): Promise<void>
@@ -88,7 +88,7 @@ let firstUnsavedAt: number | null = null
 let saveChain: Promise<void> = Promise.resolve()
 const cancelledTaskIds = new Set<string>()
 
-export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
+export const useDojo = create<DojoState & DojoActions>()((set, get) => ({
   bootError: null,
   settings: null,
   environment: null,
@@ -107,7 +107,7 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
 
   async boot() {
     const [settings] = await Promise.all([
-      docent.getSettings().catch((error: unknown) => {
+      dojo.getSettings().catch((error: unknown) => {
         set({ bootError: errorMessage(error) })
         return null
       }),
@@ -118,27 +118,27 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
 
   async refreshEnvironment() {
     try {
-      set({ environment: await docent.environment(), environmentError: null })
+      set({ environment: await dojo.environment(), environmentError: null })
     } catch (error) {
       set({ environmentError: errorMessage(error) })
     }
   },
 
   async saveSettings(settings) {
-    await docent.saveSettings(settings)
+    await dojo.saveSettings(settings)
     set({ settings })
     await get().refreshEnvironment()
   },
 
   async setApiKey(provider, key) {
-    await docent.setApiKey(provider, key)
+    await dojo.setApiKey(provider, key)
     await get().refreshEnvironment()
   },
 
   async openPullRequest(input) {
     if (get().tasks.open) return
     await flushReview()
-    const session = await runTask('open', (taskId) => docent.openPullRequest(input.trim(), taskId))
+    const session = await runTask('open', (taskId) => dojo.openPullRequest(input.trim(), taskId))
     if (!session) return
     cancelSessionTasks()
     set((state) => ({
@@ -162,7 +162,7 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
     const { session, tasks } = get()
     if (!session || tasks.tour) return
     cancelSessionTasks()
-    const record = await runTask('tour', (taskId) => docent.generateTour(session.pr.ref, taskId))
+    const record = await runTask('tour', (taskId) => dojo.generateTour(session.pr.ref, taskId))
     if (!record) return
     if (get().session?.pr.url !== session.pr.url) return
     set((state) => ({ session: state.session && { ...state.session, tour: record }, selectedStopId: null }))
@@ -180,7 +180,7 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
     const task = get().tasks[key]
     if (!task) return
     cancelledTaskIds.add(task.id)
-    docent.cancel(task.id).catch((error: unknown) => {
+    dojo.cancel(task.id).catch((error: unknown) => {
       cancelledTaskIds.delete(task.id)
       set((state) => ({ errors: { ...state.errors, [key]: errorMessage(error) } }))
     })
@@ -264,7 +264,7 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
       createdAt: new Date().toISOString(),
     }
     updateReview((review) => ({ ...review, chat: [...review.chat, asked] }))
-    const answer = await runTask('ask', (taskId) => docent.ask(session.pr.ref, selectedStopId, question, taskId))
+    const answer = await runTask('ask', (taskId) => dojo.ask(session.pr.ref, selectedStopId, question, taskId))
     if (answer) updateReview((review) => ({ ...review, chat: [...review.chat, answer] }), session.pr.url)
   },
 
@@ -273,7 +273,7 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
     const prediction = session?.review.stops[stopId]?.prediction.trim()
     if (!session || !prediction) return
     const feedback = await runTask(`grade:${stopId}`, (taskId) =>
-      docent.gradePrediction(session.pr.ref, stopId, prediction, taskId),
+      dojo.gradePrediction(session.pr.ref, stopId, prediction, taskId),
     )
     if (feedback !== null) {
       updateReview((review) => withStopProgress(review, stopId, { predictionFeedback: feedback }), session.pr.url)
@@ -284,9 +284,7 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
     const { session } = get()
     const draft = session?.review.drafts.find((candidate) => candidate.id === draftId)
     if (!session || !draft) return
-    const suggestion = await runTask(`polish:${draftId}`, (taskId) =>
-      docent.polishComment(session.pr.ref, draft, taskId),
-    )
+    const suggestion = await runTask(`polish:${draftId}`, (taskId) => dojo.polishComment(session.pr.ref, draft, taskId))
     if (suggestion === null || get().session?.pr.url !== session.pr.url) return
     set((state) => ({ polishSuggestions: { ...state.polishSuggestions, [draftId]: suggestion } }))
   },
@@ -301,14 +299,14 @@ export const useDocent = create<DocentState & DocentActions>()((set, get) => ({
     await flushReview()
     const session = get().session
     if (!session) return
-    const url = await docent.submitReview(session.review, event)
+    const url = await dojo.submitReview(session.review, event)
     updateReview((review) => ({ ...review, drafts: [], body: '', submittedReviewUrl: url }), session.pr.url)
     await flushReview()
   },
 }))
 
 export function useSession(): PrSession {
-  const session = useDocent((state) => state.session)
+  const session = useDojo((state) => state.session)
   if (!session) throw new Error('No pull request is open.')
   return session
 }
@@ -320,21 +318,21 @@ export function flushReview(): Promise<void> {
   firstUnsavedAt = null
   if (review) {
     saveChain = saveChain
-      .then(() => docent.saveReview(review))
+      .then(() => dojo.saveReview(review))
       .then(
-        () => useDocent.setState({ saveError: null }),
-        (error: unknown) => useDocent.setState({ saveError: errorMessage(error) }),
+        () => useDojo.setState({ saveError: null }),
+        (error: unknown) => useDojo.setState({ saveError: errorMessage(error) }),
       )
   }
   return saveChain
 }
 
 function updateReview(recipe: (review: ReviewState) => ReviewState, expectedPrUrl?: string): void {
-  const { session } = useDocent.getState()
+  const { session } = useDojo.getState()
   if (!session || (expectedPrUrl !== undefined && session.pr.url !== expectedPrUrl)) return
   const review = recipe(session.review)
   if (review === session.review) return
-  useDocent.setState({ session: { ...session, review } })
+  useDojo.setState({ session: { ...session, review } })
   // Continuous typing keeps resetting the debounce, so a change never waits longer than the cap.
   firstUnsavedAt ??= Date.now()
   unsavedReview = review
@@ -349,7 +347,7 @@ function withStopProgress(review: ReviewState, stopId: string, patch: Partial<St
 
 /** Tracks a bridge task under `key`; resolves to null when it fails or is cancelled. */
 async function runTask<T>(key: TaskKey, run: (taskId: string) => Promise<T>): Promise<T | null> {
-  const { setState } = useDocent
+  const { setState } = useDojo
   const task = startTask(run, (event) =>
     setState((state) => {
       const current = state.tasks[key]
@@ -376,7 +374,7 @@ async function runTask<T>(key: TaskKey, run: (taskId: string) => Promise<T>): Pr
 }
 
 function cancelSessionTasks(): void {
-  const { tasks, cancelTask } = useDocent.getState()
+  const { tasks, cancelTask } = useDojo.getState()
   for (const key of Object.keys(tasks) as TaskKey[]) {
     if (key !== 'open') cancelTask(key)
   }

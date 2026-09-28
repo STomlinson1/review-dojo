@@ -1,6 +1,6 @@
-import type { DocentApi, ProgressEvent } from '../../shared/types'
+import type { DojoApi, ProgressEvent } from '../../shared/types'
 
-export const docent: DocentApi = window.docent
+export const dojo: DojoApi = window.dojo
 
 const IPC_PREFIX = /^Error invoking remote method '[^']+': (?:\w*Error: )?/
 
@@ -17,7 +17,7 @@ export interface Task<T> {
 
 export function startTask<T>(run: (taskId: string) => Promise<T>, onProgress: (event: ProgressEvent) => void): Task<T> {
   const id = crypto.randomUUID()
-  const unsubscribe = docent.onProgress((event) => {
+  const unsubscribe = dojo.onProgress((event) => {
     if (event.taskId === id) onProgress(event)
   })
   return { id, result: run(id).finally(unsubscribe) }

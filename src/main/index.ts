@@ -1,13 +1,13 @@
 import { join, relative, isAbsolute } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { app, BrowserWindow, ipcMain, nativeTheme, net, protocol, shell } from 'electron'
-import { Docent } from '../engine/docent'
+import { Dojo } from '../engine/dojo'
 import { channel, invokeMethods, PROGRESS_CHANNEL } from '../shared/api'
 import { createHandlers } from './handlers'
 import { SettingsStore } from './settings'
 import { adoptLoginShellPath } from './shellPath'
 
-const APP_ORIGIN = 'app://docent'
+const APP_ORIGIN = 'app://review-dojo'
 const rendererDir = join(import.meta.dirname, '../renderer')
 const devServerUrl = process.env.ELECTRON_RENDERER_URL
 
@@ -36,7 +36,7 @@ function createWindow(): BrowserWindow {
     height: 940,
     minWidth: 1080,
     minHeight: 640,
-    title: 'Docent',
+    title: 'Review Dojo',
     titleBarStyle: 'hiddenInset',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#16171a' : '#fbfbfa',
     webPreferences: {
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
 
   const dataDir = app.getPath('userData')
   const window = createWindow()
-  const handlers = createHandlers(new Docent(dataDir), new SettingsStore(dataDir), (event) => {
+  const handlers = createHandlers(new Dojo(dataDir), new SettingsStore(dataDir), (event) => {
     if (!window.isDestroyed()) window.webContents.send(PROGRESS_CHANNEL, event)
   })
 

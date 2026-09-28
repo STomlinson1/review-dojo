@@ -8,7 +8,7 @@ import type {
 } from '../../../shared/types'
 import { formatLocation } from '../lib/codeRefs'
 import { EMPTY_PROGRESS, findStop, selectHunks, tourStops } from '../../../shared/tour'
-import { useDocent, useSession } from '../store'
+import { useDojo, useSession } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
@@ -19,7 +19,7 @@ import styles from './StopView.module.css'
 
 export function StopView({ stopId }: { stopId: string }) {
   const { diff, tour, review } = useSession()
-  const dojoMode = useDocent((state) => state.dojoMode)
+  const dojoMode = useDojo((state) => state.dojoMode)
   const found = tour ? findStop(tour.tour, stopId) : null
   const hunkIds = found?.stop.hunkIds
   const files = useMemo(() => {
@@ -93,9 +93,9 @@ function DojoCard({
   progress: StopProgress
 }) {
   const taskKey = `grade:${stopId}` as const
-  const grading = useDocent((state) => state.tasks[taskKey])
-  const gradeError = useDocent((state) => state.errors[taskKey])
-  const { updateStop, gradePrediction, cancelTask } = useDocent.getState()
+  const grading = useDojo((state) => state.tasks[taskKey])
+  const gradeError = useDojo((state) => state.errors[taskKey])
+  const { updateStop, gradePrediction, cancelTask } = useDojo.getState()
   const hasPrediction = progress.prediction.trim().length > 0
   const predictionId = `prediction-${stopId}`
 
@@ -180,7 +180,7 @@ function QuestionDisclosure({ question }: { question: ComprehensionQuestion }) {
 }
 
 function Checks({ stopId, checks, done }: { stopId: string; checks: string[]; done: number[] }) {
-  const { updateStop } = useDocent.getState()
+  const { updateStop } = useDojo.getState()
   if (checks.length === 0) return null
 
   const toggle = (index: number) =>
@@ -257,7 +257,7 @@ function ReadAlso({ refs }: { refs: ContextRef[] }) {
 }
 
 function LocationLink({ location }: { location: CodeLocation | ContextRef }) {
-  const { setOverlay } = useDocent.getState()
+  const { setOverlay } = useDojo.getState()
   return (
     <button type="button" className={styles.location} onClick={() => setOverlay({ kind: 'peek', target: location })}>
       {formatLocation(location)}
@@ -267,7 +267,7 @@ function LocationLink({ location }: { location: CodeLocation | ContextRef }) {
 
 function StopFooter({ stopId, understood }: { stopId: string; understood: boolean }) {
   const { tour } = useSession()
-  const { step, updateStop, setOverlay } = useDocent.getState()
+  const { step, updateStop, setOverlay } = useDojo.getState()
   const stops = tour ? tourStops(tour.tour) : []
   const index = stops.findIndex((stop) => stop.id === stopId)
   const isLast = index === stops.length - 1

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { DEFAULT_CLAUDE_MODEL, PROVIDER_IDS, PROVIDER_NAMES } from '../../../shared/providers'
 import type { ProviderId, ProviderSettings } from '../../../shared/types'
 import { errorMessage } from '../api'
-import { useDocent } from '../store'
+import { useDojo } from '../store'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
 import { ErrorNote } from './ErrorNote'
@@ -13,7 +13,7 @@ const CLAUDE_MODELS = [DEFAULT_CLAUDE_MODEL, 'claude-sonnet-5', 'claude-haiku-4-
 const EFFORTS = ['low', 'medium', 'high'] as const
 
 export function SettingsModal({ onClose }: { onClose(): void }) {
-  const settings = useDocent((state) => state.settings)
+  const settings = useDojo((state) => state.settings)
   const [form, setForm] = useState(settings)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +23,7 @@ export function SettingsModal({ onClose }: { onClose(): void }) {
     setSaving(true)
     setError(null)
     try {
-      await useDocent.getState().saveSettings(form)
+      await useDojo.getState().saveSettings(form)
       onClose()
     } catch (caught) {
       setError(errorMessage(caught))
@@ -97,7 +97,7 @@ interface ProviderFieldsProps {
 
 function ProviderFields({ id, settings, onChange }: ProviderFieldsProps) {
   const { auth, model, reasoningEffort } = settings
-  const status = useDocent((state) => state.environment?.providers[id])
+  const status = useDojo((state) => state.environment?.providers[id])
   const name = PROVIDER_NAMES[id]
 
   return (
@@ -196,7 +196,7 @@ function ApiKeyField({ provider, hasApiKey }: { provider: ProviderId; hasApiKey:
     setBusy(true)
     setError(null)
     try {
-      await useDocent.getState().setApiKey(provider, value)
+      await useDojo.getState().setApiKey(provider, value)
       setKey('')
     } catch (caught) {
       setError(errorMessage(caught))

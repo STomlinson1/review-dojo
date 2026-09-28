@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { findStop } from '../../../shared/tour'
-import { useDocent, useSession } from '../store'
+import { useDojo, useSession } from '../store'
 import { ActivityLog } from './ActivityLog'
 import styles from './AskPanel.module.css'
 import { Button } from './Button'
@@ -23,11 +23,11 @@ const OVERVIEW_STARTERS = [
 
 export function AskPanel() {
   const { tour, review } = useSession()
-  const stopId = useDocent((state) => state.selectedStopId)
-  const pending = useDocent((state) => state.tasks.ask)
-  const error = useDocent((state) => state.errors.ask)
-  const focusRequest = useDocent((state) => state.askFocusRequest)
-  const { ask, cancelTask, dismissError, setAskOpen } = useDocent.getState()
+  const stopId = useDojo((state) => state.selectedStopId)
+  const pending = useDojo((state) => state.tasks.ask)
+  const error = useDojo((state) => state.errors.ask)
+  const focusRequest = useDojo((state) => state.askFocusRequest)
+  const { ask, cancelTask, dismissError, setAskOpen } = useDojo.getState()
   const [showAll, setShowAll] = useState(false)
   const [question, setQuestion] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)

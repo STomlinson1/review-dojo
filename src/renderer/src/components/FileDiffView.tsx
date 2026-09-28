@@ -3,10 +3,10 @@ import { PatchDiff } from '@pierre/diffs/react'
 import { memo, useCallback, useMemo, useState } from 'react'
 import { hunkContaining } from '../../../shared/review'
 import type { DiffFile, DraftComment, Hunk } from '../../../shared/types'
-import { docent } from '../api'
+import { dojo } from '../api'
 import { type CommentTarget, commentTarget, lineLabel, toAnnotationSide } from '../lib/comments'
 import { synthesizePatch } from '../lib/patch'
-import { useDocent } from '../store'
+import { useDojo } from '../store'
 import { CommentForm, DraftCard, SelectionError } from './Comments'
 import styles from './FileDiffView.module.css'
 
@@ -24,10 +24,10 @@ interface FileDiffViewProps {
 }
 
 export const FileDiffView = memo(function FileDiffView({ file, hunks, stopId }: FileDiffViewProps) {
-  const prRef = useDocent((state) => state.session?.pr.ref)
-  const allDrafts = useDocent((state) => state.session?.review.drafts)
-  const diffStyle = useDocent((state) => state.diffStyle)
-  const { addDraft } = useDocent.getState()
+  const prRef = useDojo((state) => state.session?.pr.ref)
+  const allDrafts = useDojo((state) => state.session?.review.drafts)
+  const diffStyle = useDojo((state) => state.diffStyle)
+  const { addDraft } = useDojo.getState()
   const [dragRange, setDragRange] = useState<SelectedLineRange | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
 
@@ -49,8 +49,8 @@ export const FileDiffView = memo(function FileDiffView({ file, hunks, stopId }: 
     const oldPath = file.oldPath ?? file.path
     return async () => {
       const [before, after] = await Promise.all([
-        docent.readFile(prRef, oldPath, 'base'),
-        docent.readFile(prRef, file.path, 'head'),
+        dojo.readFile(prRef, oldPath, 'base'),
+        dojo.readFile(prRef, file.path, 'head'),
       ])
       if (before === null || after === null) throw new Error(`Couldn't read ${file.path} to expand context.`)
       return { oldFile: { name: oldPath, contents: before }, newFile: { name: file.path, contents: after } }

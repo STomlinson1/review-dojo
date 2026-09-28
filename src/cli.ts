@@ -1,12 +1,12 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { Docent } from './engine/docent'
+import { Dojo } from './engine/dojo'
 import { apiKeyFromEnv, createProvider } from './engine/providers'
 import { DEFAULT_SETTINGS, PROVIDER_IDS } from './shared/providers'
 import type { AgentEvent, ProviderId } from './shared/types'
 
-const USAGE = `Usage: docent tour <pr-url | owner/repo#number> [--provider claude|codex] [--model <id>]
+const USAGE = `Usage: review-dojo tour <pr-url | owner/repo#number> [--provider claude|codex] [--model <id>]
 
 Prints the tour as JSON on stdout and progress on stderr. Uses ANTHROPIC_API_KEY, or CODEX_API_KEY /
 OPENAI_API_KEY, when set; otherwise your \`claude auth login\` / \`codex login\` session.`
@@ -32,7 +32,7 @@ async function main(): Promise<void> {
     ...(values.model ? { model: values.model } : {}),
   })
 
-  const docent = new Docent(join(homedir(), 'Library', 'Application Support', 'Docent'))
+  const dojo = new Dojo(join(homedir(), 'Library', 'Application Support', 'Review Dojo'))
   const log = (text: string) => process.stderr.write(`${text}\n`)
   const controller = new AbortController()
   process.once('SIGINT', () => controller.abort())
@@ -40,12 +40,12 @@ async function main(): Promise<void> {
     signal: controller.signal,
     onEvent: (event: AgentEvent) => log(event.kind === 'step' ? `  ${event.text}` : `  » ${event.text.split('\n')[0]}`),
   }
-  const session = await docent.openPullRequest(target, task)
+  const session = await dojo.openPullRequest(target, task)
   log(
     `${session.diff.files.length} files, ${session.diff.files.reduce((sum, file) => sum + file.hunks.length, 0)} hunks`,
   )
 
-  const record = await docent.generateTour(session.pr.ref, provider, task)
+  const record = await dojo.generateTour(session.pr.ref, provider, task)
   process.stdout.write(`${JSON.stringify(record, null, 2)}\n`)
 }
 

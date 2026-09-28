@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { draftProblem } from '../../../shared/review'
 import type { DraftComment, ReviewEvent } from '../../../shared/types'
-import { docent, errorMessage } from '../api'
+import { dojo, errorMessage } from '../api'
 import { lineLabel } from '../lib/comments'
 import { tourStops } from '../../../shared/tour'
-import { useDocent, useSession } from '../store'
+import { useDojo, useSession } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { Dialog } from './Dialog'
@@ -25,7 +25,7 @@ type Submission =
 
 export function SubmitPanel({ onClose }: { onClose(): void }) {
   const { diff, tour, review } = useSession()
-  const { setReviewBody, submitReview, select } = useDocent.getState()
+  const { setReviewBody, submitReview, select } = useDojo.getState()
   const [event, setEvent] = useState<ReviewEvent>('PENDING')
   const [submission, setSubmission] = useState<Submission>({ status: 'idle' })
 
@@ -110,7 +110,7 @@ export function SubmitPanel({ onClose }: { onClose(): void }) {
             <span>Your review was sent to GitHub.</span>
             <Button
               size="sm"
-              onClick={() => review.submittedReviewUrl && void docent.openExternal(review.submittedReviewUrl)}
+              onClick={() => review.submittedReviewUrl && void dojo.openExternal(review.submittedReviewUrl)}
             >
               <ExternalIcon />
               Open on GitHub
@@ -198,10 +198,10 @@ export function SubmitPanel({ onClose }: { onClose(): void }) {
 }
 
 function DraftEditor({ draft, problem, onLocate }: { draft: DraftComment; problem: string | null; onLocate(): void }) {
-  const suggestion = useDocent((state) => state.polishSuggestions[draft.id])
-  const polishing = useDocent((state) => state.tasks[`polish:${draft.id}`])
-  const polishError = useDocent((state) => state.errors[`polish:${draft.id}`])
-  const { updateDraft, deleteDraft, polishDraft, resolvePolish, cancelTask } = useDocent.getState()
+  const suggestion = useDojo((state) => state.polishSuggestions[draft.id])
+  const polishing = useDojo((state) => state.tasks[`polish:${draft.id}`])
+  const polishError = useDojo((state) => state.errors[`polish:${draft.id}`])
+  const { updateDraft, deleteDraft, polishDraft, resolvePolish, cancelTask } = useDojo.getState()
 
   return (
     <div className={styles.draft} data-problem={problem !== null}>
