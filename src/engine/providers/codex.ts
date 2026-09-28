@@ -62,7 +62,10 @@ export class CodexProvider implements Provider {
         case 'item.completed':
           if (event.item.type === 'reasoning' && event.item.text.trim())
             request.onEvent({ kind: 'text', text: event.item.text })
-          if (event.item.type === 'agent_message') finalText = event.item.text
+          if (event.item.type === 'agent_message') {
+            drafts.flush()
+            finalText = event.item.text
+          }
           break
         case 'turn.completed':
           usage = { inputTokens: event.usage.input_tokens, outputTokens: event.usage.output_tokens, costUsd: null }

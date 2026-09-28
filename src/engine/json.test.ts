@@ -32,5 +32,6 @@ describe('closeTruncatedJson', () => {
   it('returns a finished document unchanged and nothing before the object starts', () => {
     expect(closeTruncatedJson('Here you go: {"a": 1} trailing')).toBe('{"a": 1}')
     expect(closeTruncatedJson('Still exploring')).toBeNull()
+    expect(closeTruncatedJson('Hunks {H1} and {H2} first. {"a": [1, 2')).toBe('{"a": [1]}')
   })
 })

@@ -23,7 +23,7 @@ import type {
   TourRecord,
 } from '../shared/types'
 import { run } from './exec'
-import { Workspace } from './git'
+import { treeEntries, Workspace } from './git'
 import { changedPaths, fileDigests } from './digest'
 import { fetchPullRequest, fetchStack, fetchThreads, parsePrRef, submitReview } from './github'
 import { parseStructured } from './json'
@@ -86,7 +86,7 @@ export class Dojo {
       fetchThreads(ref).catch(() => []),
       this.store.loadLessons(ref),
     ])
-    const review = saved ?? (await this.freshReview(pr, diff))
+    const review = saved ?? (await this.freshReview(pr, diff, worktree))
     this.store.recordOpened(pr)
     this.open.set(refKey(ref), {
       pr,
@@ -124,18 +124,23 @@ export class Dojo {
       tools: 'repo' as const,
       streamDrafts: true,
       signal: task.signal,
-      onEvent: previewTour(session.diff, task.onEvent),
     }
     const context = { lessons, threads: session.threads, previous: session.previous }
     let result = await provider.run({
       ...request,
+      onEvent: previewTour(session.diff, task.onEvent),
       prompt: tourPrompt(session.pr, session.stack, session.diff, context),
       resume: null,
     })
     let parsed = parseStructured(result.text, rawTourSchema)
     if (!parsed.success && result.sessionId) {
       task.onEvent({ kind: 'step', text: 'Correcting the tour format' })
-      result = await provider.run({ ...request, prompt: tourRepairPrompt(parsed.error), resume: result.sessionId })
+      result = await provider.run({
+        ...request,
+        onEvent: previewTour(session.diff, task.onEvent),
+        prompt: tourRepairPrompt(parsed.error),
+        resume: result.sessionId,
+      })
       parsed = parseStructured(result.text, rawTourSchema)
     }
     if (!parsed.success) throw new Error(`The ${provider.id} agent returned an unusable tour: ${parsed.error}`)
@@ -171,11 +176,14 @@ export class Dojo {
   }
 
   private async selectedCode(ref: PrRef, selection: CodeSelection): Promise<string> {
-    const contents = await this.readFile(ref, selection.path, selection.side === 'LEFT' ? 'base' : 'head')
-    if (contents === null) throw new Error(`Couldn't read ${selection.path}.`)
+    const file = this.session(ref).diff.files.find((candidate) => candidate.path === selection.path)
+    const path = selection.side === 'LEFT' ? (file?.oldPath ?? selection.path) : selection.path
+    const contents = await this.readFile(ref, path, selection.side === 'LEFT' ? 'base' : 'head')
+    if (contents === null) throw new Error(`Couldn't read ${path}.`)
+    const start = Math.max(1, selection.startLine)
     return contents
       .split('\n')
-      .slice(selection.startLine - 1, selection.endLine)
+      .slice(start - 1, Math.max(start, selection.endLine))
       .join('\n')
   }
 
@@ -260,8 +268,9 @@ export class Dojo {
    * A new push starts a fresh review. Unsent drafts from the reviewer's latest earlier review carry
    * over, and the files whose changes differ from what they saw are recorded.
    */
-  private async freshReview(pr: PullRequest, diff: Diff): Promise<ReviewState> {
-    const digests = fileDigests(diff)
+  private async freshReview(pr: PullRequest, diff: Diff, worktree: string): Promise<ReviewState> {
+    const textless = diff.files.filter((file) => file.hunks.length === 0).map((file) => file.path)
+    const digests = fileDigests(diff, await treeEntries(worktree, pr.headSha, textless))
     const prior = await this.store.latestOtherReview(pr.ref, pr.headSha)
     const drafts = prior?.drafts.map((draft) => ({ ...draft, stopId: null })) ?? []
     return {
@@ -270,7 +279,7 @@ export class Dojo {
       previous: prior
         ? {
             headSha: prior.headSha,
-            changedPaths: changedPaths(prior.fileDigests, digests),
+            changedPaths: changedPaths(prior.fileDigests ?? {}, digests),
             carriedDrafts: drafts.length,
           }
         : null,

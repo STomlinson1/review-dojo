@@ -2,13 +2,18 @@ import { type ZodType, z } from 'zod'
 
 const VALID_ESCAPE = /["\\/bfnrtu]/
 
+/** Prose before the JSON can mention braces (`{H1}`); an object that opens with a key cannot be prose. */
+function jsonStart(text: string): number {
+  return text.search(/\{\s*"/)
+}
+
 /**
  * Parses a JSON object written by a model. Models quoting source code routinely emit escapes JSON
  * does not allow (`\0`, `\s`) and raw newlines inside strings; both are repaired rather than
  * rejected, since the intended text is unambiguous.
  */
 export function parseModelJson(text: string): unknown {
-  const start = text.indexOf('{')
+  const start = jsonStart(text)
   const end = text.lastIndexOf('}')
   if (start === -1 || end < start) throw new SyntaxError('No JSON object in the response.')
   const candidate = text.slice(start, end + 1)
@@ -62,7 +67,7 @@ export function parseStructured<T>(text: string, schema: ZodType<T>): Parsed<T> 
  * open containers, so everything finished so far can be parsed.
  */
 export function closeTruncatedJson(text: string): string | null {
-  const start = text.indexOf('{')
+  const start = jsonStart(text)
   if (start === -1) return null
   const closers: string[] = []
   let inString = false

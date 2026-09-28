@@ -99,6 +99,22 @@ export class Workspace {
   }
 }
 
+/** Mode and blob id per path at `sha`; identifies content git shows no text diff for, such as binaries. */
+export async function treeEntries(cwd: string, sha: string, paths: string[]): Promise<Record<string, string>> {
+  if (paths.length === 0) return {}
+  const output = await run('git', ['ls-tree', '-z', sha, '--', ...paths], { cwd })
+  return Object.fromEntries(
+    output
+      .split('\0')
+      .filter(Boolean)
+      .map((entry) => {
+        const [meta, path] = entry.split('\t')
+        const [mode, , blob] = meta.split(' ')
+        return [path, `${mode} ${blob}`]
+      }),
+  )
+}
+
 const WORKTREES_KEPT_PER_REPO = 6
 
 /** A full checkout per PR head adds up on large repositories, so only the most recently opened stay. */

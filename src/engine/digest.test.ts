@@ -21,11 +21,23 @@ const context = (text: string, line: number): DiffLine => ({ kind: 'context', ol
 
 describe('changed files since the last review', () => {
   it('ignores line shifts from a rebase but catches edited, added and dropped files', () => {
-    const before = fileDigests(diff(file('a.ts', 10, [context('x', 10), add('y', 11)]), file('b.ts', 1, [add('z', 1)])))
+    const before = fileDigests(
+      diff(file('a.ts', 10, [context('x', 10), add('y', 11)]), file('b.ts', 1, [add('z', 1)])),
+      {},
+    )
     const after = fileDigests(
       diff(file('a.ts', 40, [context('moved', 40), add('y', 41)]), file('c.ts', 1, [add('new', 1)])),
+      {},
     )
     expect(changedPaths(before, after)).toEqual(['b.ts', 'c.ts'])
-    expect(changedPaths(before, fileDigests(diff(file('a.ts', 10, [add('edited', 11)]))))).toContain('a.ts')
+    const edited = fileDigests(diff(file('a.ts', 10, [add('edited', 11)])), {})
+    expect(changedPaths(before, edited)).toContain('a.ts')
+  })
+
+  it('tells binary versions apart by their tree entry', () => {
+    const image = { ...file('logo.png', 1, []), isBinary: true, hunks: [] }
+    const first = fileDigests(diff(image), { 'logo.png': '100644 aaa' })
+    const second = fileDigests(diff(image), { 'logo.png': '100644 bbb' })
+    expect(changedPaths(first, second)).toEqual(['logo.png'])
   })
 })
