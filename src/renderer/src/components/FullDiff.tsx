@@ -1,7 +1,9 @@
 import { type CSSProperties, createContext, memo, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { findStop, stopIdsByHunk } from '../../../shared/tour'
 import type { DiffFile, Hunk } from '../../../shared/types'
-import { type Segment, fileSegments, lastStartingAtOrAbove, unchangedLinesBefore } from '../lib/fullDiff'
-import { useDojo, useSession, useTour } from '../store'
+import { fileSegments, lastStartingAtOrAbove, unchangedLinesBefore } from '../lib/fullDiff'
+import { currentTour, useDojo, useSession, useTour } from '../store'
 import { Button } from './Button'
 import { FileDiffView } from './FileDiffView'
 import styles from './FullDiff.module.css'
@@ -24,36 +26,21 @@ export function FullDiff() {
   const tour = useTour()
   const selectedStopId = useDojo((state) => state.selectedStopId)
   const diffFocus = useDojo((state) => state.diffFocus)
+  const onlyChanged = useDojo((state) => state.diffFilter === 'changedSinceReview')
+  const { setDiffFilter } = useDojo.getState()
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
-  const [changedFilter, setChangedFilter] = useState<{ sinceFocusRequest: number } | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const observe = useNearViewport(scroller)
   const changedPaths = useMemo(() => new Set(review.previous?.changedPaths), [review.previous])
   const changedFiles = diff.files.filter((file) => changedPaths.has(file.path)).length
-  const files = useMemo(
-    () =>
-      diff.files
-        .filter((file) => !changedFilter || changedPaths.has(file.path))
-        .map((file) => ({ file, segments: fileSegments(file, tour) })),
-    [diff, tour, changedFilter, changedPaths],
-  )
-  // Only a stop chosen after the filter was turned on reveals hidden files again.
-  const focusHidden =
-    changedFilter !== null &&
-    diffFocus !== null &&
-    diffFocus.request > changedFilter.sinceFocusRequest &&
-    !files.some(({ file }) => file.hunks.some((hunk) => hunk.id === diffFocus.hunkId))
+  const owners = useMemo(() => (tour ? stopIdsByHunk(tour) : new Map<string, string>()), [tour])
+  const files = onlyChanged ? diff.files.filter((file) => changedPaths.has(file.path)) : diff.files
 
   useScrollSpy(scroller)
   useEffect(() => {
-    if (focusHidden) setChangedFilter(null)
-  }, [focusHidden])
-  useEffect(() => {
     const content = contentRef.current
-    return scroller && content && diffFocus && !focusHidden
-      ? holdHunkInView(scroller, content, diffFocus.hunkId)
-      : undefined
-  }, [scroller, diffFocus, focusHidden])
+    return scroller && content && diffFocus ? holdHunkInView(scroller, content, diffFocus.hunkId) : undefined
+  }, [scroller, diffFocus])
 
   return (
     <section
@@ -71,8 +58,8 @@ export function FullDiff() {
         <label className={styles.filter}>
           <input
             type="checkbox"
-            checked={changedFilter !== null}
-            onChange={() => setChangedFilter(changedFilter ? null : { sinceFocusRequest: diffFocus?.request ?? 0 })}
+            checked={onlyChanged}
+            onChange={() => setDiffFilter(onlyChanged ? 'all' : 'changedSinceReview')}
           />
           Only changes since my review
           <span className={styles.filterCount}>
@@ -83,11 +70,11 @@ export function FullDiff() {
       {diff.files.length === 0 ? <p className={styles.muted}>This pull request changes no files.</p> : null}
       <div ref={contentRef}>
         <NearViewport.Provider value={observe}>
-          {files.map(({ file, segments }) => (
+          {files.map((file) => (
             <FileCard
               key={file.path}
               file={file}
-              segments={segments}
+              owners={owners}
               selectedStopId={selectedStopId}
               changedSinceReview={changedPaths.has(file.path)}
             />
@@ -100,13 +87,15 @@ export function FullDiff() {
 
 interface FileCardProps {
   file: DiffFile
-  segments: Segment[]
+  owners: ReadonlyMap<string, string>
   selectedStopId: string | null
   changedSinceReview: boolean
 }
 
-const FileCard = memo(function FileCard({ file, segments, selectedStopId, changedSinceReview }: FileCardProps) {
+const FileCard = memo(function FileCard({ file, owners, selectedStopId, changedSinceReview }: FileCardProps) {
   const [generatedShown, setGeneratedShown] = useState(false)
+  const [rendered] = useState(() => new Set<string>())
+  const segments = useMemo(() => fileSegments(file, owners), [file, owners])
   const collapsed = file.isGenerated && !generatedShown
 
   return (
@@ -133,13 +122,16 @@ const FileCard = memo(function FileCard({ file, segments, selectedStopId, change
       </header>
       {collapsed
         ? null
-        : segments.map((segment) => (
+        : segments.map(({ stopId, start, end }) => (
             <SegmentView
-              key={segment.hunks[0].id}
+              key={file.hunks[start].id}
               file={file}
-              segment={segment}
-              selected={segment.stop !== null && segment.stop.id === selectedStopId}
-              dimmed={segment.stop !== null && selectedStopId !== null && segment.stop.id !== selectedStopId}
+              start={start}
+              end={end}
+              stopId={stopId}
+              selected={stopId !== null && stopId === selectedStopId}
+              dimmed={stopId !== null && selectedStopId !== null && stopId !== selectedStopId}
+              rendered={rendered}
             />
           ))}
     </article>
@@ -148,17 +140,28 @@ const FileCard = memo(function FileCard({ file, segments, selectedStopId, change
 
 interface SegmentViewProps {
   file: DiffFile
-  segment: Segment
+  start: number
+  end: number
+  stopId: string | null
   selected: boolean
   dimmed: boolean
+  /** Hunks of the file that have rendered once, so segments split off from them render right away. */
+  rendered: Set<string>
 }
 
-function SegmentView({ file, segment, selected, dimmed }: SegmentViewProps) {
+const SegmentView = memo(function SegmentView({
+  file,
+  start,
+  end,
+  stopId,
+  selected,
+  dimmed,
+  rendered,
+}: SegmentViewProps) {
   const observe = useContext(NearViewport)
   const ref = useRef<HTMLDivElement>(null)
-  const [near, setNear] = useState(false)
-  const { select } = useDojo.getState()
-  const { stop, hunks } = segment
+  const hunks = useMemo(() => file.hunks.slice(start, end), [file, start, end])
+  const [near, setNear] = useState(() => hunks.some((hunk) => rendered.has(hunk.id)))
   const skipped = hunks.length < file.hunks.length ? unchangedLinesBefore(file, hunks[0]) : 0
 
   useEffect(() => {
@@ -167,30 +170,23 @@ function SegmentView({ file, segment, selected, dimmed }: SegmentViewProps) {
     return observe(element, () => setNear(true))
   }, [near, observe])
 
+  useEffect(() => {
+    if (near) for (const hunk of hunks) rendered.add(hunk.id)
+  }, [near, hunks, rendered])
+
   return (
     <div
       ref={ref}
       className={styles.segment}
       data-segment
-      data-stop-id={stop?.id}
+      data-stop-id={stopId ?? undefined}
       data-hunks={hunkIds(hunks)}
       data-selected={selected}
       data-dimmed={dimmed}
     >
-      {stop ? (
+      {stopId ? (
         <div className={styles.owner}>
-          <button
-            type="button"
-            className={styles.chip}
-            aria-current={selected ? 'step' : undefined}
-            title={`Go to stop: ${stop.title}`}
-            onClick={() => select(stop.id)}
-          >
-            <RiskDot risk={stop.risk} />
-            <span className={styles.chipTitle}>
-              <InlineCode>{stop.title}</InlineCode>
-            </span>
-          </button>
+          <StopChip stopId={stopId} selected={selected} />
           {skipped > 0 ? (
             <span className={styles.skipped}>
               {skipped} unchanged {skipped === 1 ? 'line' : 'lines'} above
@@ -200,12 +196,39 @@ function SegmentView({ file, segment, selected, dimmed }: SegmentViewProps) {
       ) : null}
       <div className={styles.hunks}>
         {near ? (
-          <FileDiffView file={file} hunks={hunks} stopId={stop?.id ?? null} embedded />
+          <FileDiffView file={file} hunks={hunks} stopId={stopId} withoutFileHeader />
         ) : (
           <div style={{ height: estimatedHeight(hunks) }} />
         )}
       </div>
     </div>
+  )
+})
+
+function StopChip({ stopId, selected }: { stopId: string; selected: boolean }) {
+  const stop = useDojo(
+    useShallow((state) => {
+      const tour = currentTour(state)
+      const found = tour ? findStop(tour, stopId)?.stop : undefined
+      return found && { title: found.title, risk: found.risk }
+    }),
+  )
+  const { select } = useDojo.getState()
+  if (!stop) return null
+
+  return (
+    <button
+      type="button"
+      className={styles.chip}
+      aria-current={selected ? 'step' : undefined}
+      title={`Go to stop: ${stop.title}`}
+      onClick={() => select(stopId)}
+    >
+      <RiskDot risk={stop.risk} />
+      <span className={styles.chipTitle}>
+        <InlineCode>{stop.title}</InlineCode>
+      </span>
+    </button>
   )
 }
 

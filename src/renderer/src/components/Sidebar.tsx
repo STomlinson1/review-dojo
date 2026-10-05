@@ -1,6 +1,4 @@
-import { useMemo } from 'react'
-import { changedPathsByStop } from '../lib/locate'
-import { useDojo, usePreviewing, useSession, useTour } from '../store'
+import { useChangedPathsByStop, useDojo, usePreviewing, useSession, useTour } from '../store'
 import { Pulse } from './ActivityLog'
 import { CheckIcon } from './icons'
 import { RiskDot } from './Risk'
@@ -8,17 +6,13 @@ import { InlineCode } from './Markdown'
 import styles from './Sidebar.module.css'
 
 export function Sidebar() {
-  const { diff, review } = useSession()
+  const { review } = useSession()
   const tour = useTour()
   const previewing = usePreviewing()
   const selectedStopId = useDojo((state) => state.selectedStopId)
   const spiedStopId = useDojo((state) => state.spiedStopId)
   const { select } = useDojo.getState()
-  const changedPaths = review.previous?.changedPaths
-  const updated = useMemo(
-    () => (tour && changedPaths ? changedPathsByStop(tour, diff, changedPaths) : null),
-    [tour, diff, changedPaths],
-  )
+  const updated = useChangedPathsByStop()
   if (!tour) return null
 
   return (

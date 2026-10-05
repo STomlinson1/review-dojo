@@ -1,17 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { tourToMarkdown } from '../../../shared/guide'
 import { PROVIDER_NAMES } from '../../../shared/providers'
-import type { DiffFile, IntentCheck, PreviousReview, Stop, TeamLessons, Tour } from '../../../shared/types'
-import { dojo, errorMessage } from '../api'
-import { formatUsage, relativeTime } from '../lib/format'
-import { changedPathsByStop } from '../lib/locate'
-import { findHunk, stopForHunk, tourStops } from '../../../shared/tour'
+import { tourStops } from '../../../shared/tour'
+import type { DiffFile, Stop, Tour } from '../../../shared/types'
+import { errorMessage } from '../api'
+import { formatUsage } from '../lib/format'
 import { useDojo, usePreviewing, useSession, useTour } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
+import { ChangesSinceReview } from './ChangesSinceReview'
 import { OpenDiscussion } from './Discussion'
 import { ErrorNote } from './ErrorNote'
-import { CheckIcon, ExternalIcon } from './icons'
+import { CheckIcon } from './icons'
+import { IntentSection } from './Intent'
+import { LessonsSection } from './Lessons'
 import { InlineCode, Markdown } from './Markdown'
 import styles from './Overview.module.css'
 import { RiskBadge } from './Risk'
@@ -64,7 +66,7 @@ export function Overview() {
       </header>
 
       {previewing ? null : <RegenerationStatus />}
-      {review.previous ? <ChangesSinceReview previous={review.previous} tour={tour} /> : null}
+      {review.previous ? <ChangesSinceReview previous={review.previous} /> : null}
       <Markdown>{tour.summary}</Markdown>
       <UntouredFiles files={diff.files.filter((file) => file.hunks.length === 0)} />
       <IntentSection intent={tour.intent} />
@@ -122,145 +124,6 @@ function CopyGuide({ tour }: { tour: Tour }) {
   )
 }
 
-function ChangesSinceReview({ previous, tour }: { previous: PreviousReview; tour: Tour }) {
-  const { diff } = useSession()
-  const { select } = useDojo.getState()
-  const byStop = useMemo(() => changedPathsByStop(tour, diff, previous.changedPaths), [tour, diff, previous])
-  const count = previous.changedPaths.length
-  const firstStop = (path: string) => [...byStop].find(([, paths]) => paths.includes(path))?.[0]
-  const inDiff = new Set(diff.files.map((file) => file.path))
-
-  return (
-    <section className={styles.changes} aria-labelledby="changes-heading">
-      <h2 id="changes-heading" className={styles.changesTitle}>
-        You reviewed an earlier version ({previous.headSha.slice(0, 7)}).{' '}
-        {count === 0 ? 'No file changed since.' : `${count} ${count === 1 ? 'file' : 'files'} changed since.`}
-      </h2>
-      {count > 0 ? (
-        <ul className={styles.changedList}>
-          {previous.changedPaths.map((path) => {
-            const stopId = firstStop(path)
-            return (
-              <li key={path}>
-                {stopId ? (
-                  <button type="button" className={styles.changedPath} onClick={() => select(stopId)}>
-                    {path}
-                  </button>
-                ) : (
-                  <span className={styles.changedPlain}>
-                    <code>{path}</code>
-                    {inDiff.has(path) ? null : ' (no longer in the pull request)'}
-                  </span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      ) : null}
-    </section>
-  )
-}
-
-function LessonsSection({ lessons }: { lessons: TeamLessons | null }) {
-  const task = useDojo((state) => state.tasks.lessons)
-  const error = useDojo((state) => state.errors.lessons)
-  const { refreshLessons, cancelTask, dismissError } = useDojo.getState()
-  const count = lessons?.lessons.length ?? 0
-
-  const status = (
-    <>
-      {task ? (
-        <ActivityLog task={task} label="Learning from past reviews" limit={3} onCancel={() => cancelTask('lessons')} />
-      ) : null}
-      {error ? (
-        <ErrorNote title="Couldn't refresh the team's review lessons" message={error}>
-          <Button size="sm" onClick={() => dismissError('lessons')}>
-            Dismiss
-          </Button>
-        </ErrorNote>
-      ) : null}
-    </>
-  )
-  const refresh = (
-    <Button size="sm" variant="ghost" disabled={task !== undefined} onClick={() => void refreshLessons()}>
-      {lessons ? 'Refresh' : 'Learn now'}
-    </Button>
-  )
-
-  if (!lessons || count === 0) {
-    return (
-      <section className={styles.section} aria-labelledby="lessons-heading">
-        <h2 id="lessons-heading" className={styles.sectionTitle}>
-          Team review lessons
-        </h2>
-        <p className={styles.lessonsEmpty}>
-          <span className={styles.muted}>
-            {lessons
-              ? `No recurring expectations stood out in ${lessons.sourceCount} past review comments.`
-              : "Lessons come from this repository's past review comments and are learned when a tour is generated."}
-          </span>
-          {refresh}
-        </p>
-        {status}
-      </section>
-    )
-  }
-
-  return (
-    <details className={styles.lessons}>
-      <summary className={styles.sectionTitle}>
-        Team review lessons <span className={styles.lessonCount}>{count}</span>
-      </summary>
-      <div className={styles.lessonsBody}>
-        <p className={styles.lessonsMeta}>
-          <span>
-            Learned from {lessons.sourceCount} review comments · {relativeTime(lessons.generatedAt)}
-          </span>
-          {refresh}
-        </p>
-        {status}
-        <ol className={styles.lessonList}>
-          {lessons.lessons.map((lesson, index) => (
-            <li key={index} className={styles.lesson}>
-              <p className={styles.lessonTitle}>{lesson.title}</p>
-              <Markdown>{lesson.detail}</Markdown>
-              {lesson.examples.length > 0 ? (
-                <p className={styles.examples}>
-                  Seen in{' '}
-                  {exampleLabels(lesson.examples).map(({ url, label }) => (
-                    <button
-                      key={url}
-                      type="button"
-                      className={styles.example}
-                      title={url}
-                      onClick={() => void dojo.openExternal(url)}
-                    >
-                      {label}
-                      <ExternalIcon />
-                    </button>
-                  ))}
-                </p>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      </div>
-    </details>
-  )
-}
-
-/** Several examples often come from one pull request, so repeats are numbered to tell the links apart. */
-function exampleLabels(urls: string[]): { url: string; label: string }[] {
-  const seen = new Map<string, number>()
-  return urls.map((url) => {
-    const pull = /\/pull\/(\d+)/.exec(url)?.[1]
-    const base = pull ? `#${pull}` : 'comment'
-    const count = (seen.get(base) ?? 0) + 1
-    seen.set(base, count)
-    return { url, label: count === 1 ? base : `${base} (${count})` }
-  })
-}
-
 function UntouredFiles({ files }: { files: DiffFile[] }) {
   if (files.length === 0) return null
   return (
@@ -293,7 +156,7 @@ function Regenerate() {
   }
   return (
     <span className={styles.confirm}>
-      Replace this tour and reset your progress on it?
+      Write a new tour? Your progress on this one is cleared only if the new one replaces it.
       <Button
         size="sm"
         variant="primary"
@@ -324,103 +187,6 @@ function RegenerationStatus() {
         Dismiss
       </Button>
     </ErrorNote>
-  )
-}
-
-function IntentSection({ intent }: { intent: IntentCheck }) {
-  const unexplained = intent.unexplained.length
-  return (
-    <section className={styles.section} aria-labelledby="intent-heading">
-      <h2 id="intent-heading" className={styles.sectionTitle}>
-        Intent check
-        {unexplained > 0 ? (
-          <span className={styles.flag}>
-            {unexplained} unexplained {unexplained === 1 ? 'change' : 'changes'}
-          </span>
-        ) : null}
-      </h2>
-
-      {intent.stated.length > 0 ? (
-        <div>
-          <h3 className={styles.subTitle}>The description promises</h3>
-          <ul className={styles.stated}>
-            {intent.stated.map((item, index) => (
-              <li key={index}>
-                <Markdown inline>{item}</Markdown>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <p className={styles.muted}>The description doesn't state an intent to check the code against.</p>
-      )}
-
-      {intent.claims.length > 0 ? (
-        <div>
-          <h3 className={styles.subTitle}>What the code delivers</h3>
-          <ul className={styles.claims}>
-            {intent.claims.map((claim, index) => (
-              <li key={index} className={styles.claim}>
-                <span className={styles.status} data-status={claim.status}>
-                  {claim.status}
-                </span>
-                <div className={styles.claimBody}>
-                  <p className={styles.claimText}>{claim.claim}</p>
-                  <div className={styles.evidence}>
-                    <Markdown>{claim.evidence}</Markdown>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {unexplained > 0 ? (
-        <div className={styles.unexplained}>
-          <h3 className={styles.subTitle}>Changes the intent doesn't explain</h3>
-          <ul className={styles.unexplainedList}>
-            {intent.unexplained.map((item, index) => (
-              <li key={index}>
-                <Markdown inline>{item.description}</Markdown>
-                {item.hunkIds.length > 0 ? (
-                  <span className={styles.chips}>
-                    {item.hunkIds.map((hunkId) => (
-                      <HunkChip key={hunkId} hunkId={hunkId} />
-                    ))}
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <p className={styles.clean}>
-          <CheckIcon /> Every change traces back to the stated intent.
-        </p>
-      )}
-    </section>
-  )
-}
-
-function HunkChip({ hunkId }: { hunkId: string }) {
-  const { diff } = useSession()
-  const tour = useTour()
-  const { select } = useDojo.getState()
-  const hunk = findHunk(diff, hunkId)
-  const stop = tour ? stopForHunk(tour, hunkId) : undefined
-  const label = hunk ? `${hunk.path.slice(hunk.path.lastIndexOf('/') + 1)}:${hunk.newStart}` : hunkId
-
-  return (
-    <button
-      type="button"
-      className={styles.chip}
-      disabled={!stop}
-      title={hunk ? `${hunk.path} ${hunk.header}${stop ? ` · in “${stop.title}”` : ''}` : undefined}
-      onClick={() => stop && select(stop.id)}
-    >
-      {label}
-    </button>
   )
 }
 

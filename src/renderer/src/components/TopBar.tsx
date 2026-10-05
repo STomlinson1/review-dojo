@@ -13,12 +13,8 @@ export function TopBar() {
   const dojoMode = useDojo((state) => state.dojoMode)
   const diffStyle = useDojo((state) => state.diffStyle)
   const askOpen = useDojo((state) => state.askOpen)
-  const narrationTab = useDojo((state) => state.narrationTab)
-  const sideBySide = useSideBySide().active
-  const { closePullRequest, setDojoMode, setDiffStyle, setAskOpen, setNarrationTab, setOverlay } = useDojo.getState()
+  const { closePullRequest, setDojoMode, setDiffStyle, setAskOpen, setOverlay } = useDojo.getState()
   const stops = tour ? tourStops(tour) : []
-  const asking = sideBySide ? narrationTab === 'ask' : askOpen
-  const toggleAsk = () => (sideBySide ? setNarrationTab(asking ? 'stop' : 'ask') : setAskOpen(!askOpen))
 
   return (
     <header className={styles.bar}>
@@ -71,10 +67,10 @@ export function TopBar() {
         <Button
           variant="ghost"
           size="sm"
-          aria-pressed={asking}
+          aria-pressed={tour !== null && askOpen}
           disabled={!tour}
           title="Ask about this stop (/)"
-          onClick={toggleAsk}
+          onClick={() => setAskOpen(!askOpen)}
         >
           <AskIcon />
           Ask

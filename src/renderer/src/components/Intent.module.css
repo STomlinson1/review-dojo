@@ -1,0 +1,137 @@
+.section {
+  composes: section from './Overview.module.css';
+}
+
+.sectionTitle {
+  composes: sectionTitle from './Overview.module.css';
+}
+
+.flag {
+  composes: flag from './Overview.module.css';
+}
+
+.muted {
+  composes: muted from './Overview.module.css';
+}
+
+.subTitle {
+  margin-bottom: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.stated {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-left: 1.2em;
+  font-size: var(--text-prose);
+  line-height: 1.55;
+}
+
+.claims {
+  list-style: none;
+  padding: 0;
+  border-top: var(--hairline);
+}
+
+.claim {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: var(--hairline);
+}
+
+.status {
+  flex: none;
+  width: 72px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.status[data-status='partial'] {
+  background: var(--risk-medium-soft);
+  color: var(--risk-medium);
+}
+
+.status[data-status='missing'] {
+  background: var(--risk-high-soft);
+  color: var(--risk-high);
+}
+
+.claimBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.claimText {
+  font-size: var(--text-prose);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.evidence {
+  margin-top: var(--space-1);
+  color: var(--text-secondary);
+}
+
+.evidence > div {
+  font-size: var(--text-md);
+}
+
+.unexplained {
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--risk-medium) 35%, transparent);
+  border-radius: var(--radius);
+  background: var(--risk-medium-soft);
+}
+
+.unexplained .subTitle {
+  color: var(--risk-medium);
+}
+
+.unexplainedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-left: 1.2em;
+  font-size: var(--text-prose);
+  line-height: 1.55;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.chip {
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.clean {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--success);
+}

@@ -23,6 +23,9 @@ const OVERVIEW_STARTERS = [
   'Which changes are least related to the stated intent?',
 ]
 
+// Outlives the panel, which is often mounted by the very request it has to handle.
+let handledFocusRequest = 0
+
 export function AskPanel({ embedded = false }: { embedded?: boolean }) {
   const { review } = useSession()
   const tour = useTour()
@@ -43,7 +46,9 @@ export function AskPanel({ embedded = false }: { embedded?: boolean }) {
   const stopTitle = (id: string | null) => (id && tour ? findStop(tour, id)?.stop.title : null) ?? 'Overview'
 
   useEffect(() => {
-    if (focusRequest > 0) inputRef.current?.focus()
+    if (focusRequest <= handledFocusRequest) return
+    handledFocusRequest = focusRequest
+    inputRef.current?.focus()
   }, [focusRequest])
 
   useEffect(() => {

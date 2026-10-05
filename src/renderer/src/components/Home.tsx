@@ -9,8 +9,7 @@ import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
 import styles from './Home.module.css'
 
-type ReviewRequests =
-  { status: 'loading' } | { status: 'ready'; items: PrSummary[] } | { status: 'error'; message: string }
+type Loaded<T> = { status: 'loading' } | { status: 'ready'; items: T[] } | { status: 'error'; message: string }
 
 export function Home() {
   const opening = useDojo((state) => state.tasks.open)
@@ -120,7 +119,7 @@ function SetupStatus() {
 }
 
 function ReviewRequestList({ disabled, onOpen }: { disabled: boolean; onOpen(url: string): void }) {
-  const [requests, setRequests] = useState<ReviewRequests>({ status: 'loading' })
+  const [requests, setRequests] = useState<Loaded<PrSummary>>({ status: 'loading' })
 
   const load = useCallback(() => {
     setRequests({ status: 'loading' })
@@ -181,20 +180,20 @@ function ReviewRequestList({ disabled, onOpen }: { disabled: boolean; onOpen(url
 }
 
 function RecentReviewList({ disabled, onOpen }: { disabled: boolean; onOpen(url: string): void }) {
-  const [recent, setRecent] = useState<RecentReview[]>([])
+  const [recent, setRecent] = useState<Loaded<RecentReview>>({ status: 'loading' })
 
   useEffect(() => {
     let current = true
     dojo.recentReviews().then(
-      (items) => current && setRecent(items),
-      () => undefined,
+      (items) => current && setRecent({ status: 'ready', items }),
+      (error: unknown) => current && setRecent({ status: 'error', message: errorMessage(error) }),
     )
     return () => {
       current = false
     }
   }, [])
 
-  if (recent.length === 0) return null
+  if (recent.status === 'loading' || (recent.status === 'ready' && recent.items.length === 0)) return null
   return (
     <section className={styles.requests} aria-labelledby="recent-heading">
       <div className={styles.sectionHeader}>
@@ -202,20 +201,24 @@ function RecentReviewList({ disabled, onOpen }: { disabled: boolean; onOpen(url:
           Recently opened
         </h2>
       </div>
-      <ul className={styles.requestList}>
-        {recent.map((item) => (
-          <li key={item.url}>
-            <button type="button" className={styles.request} disabled={disabled} onClick={() => onOpen(item.url)}>
-              <span className={styles.requestMain}>
-                <span className={styles.requestTitle}>{item.title}</span>
-                <span className={styles.requestMeta}>
-                  {item.ref.owner}/{item.ref.repo} #{item.ref.number} · {relativeTime(item.openedAt)}
+      {recent.status === 'error' ? (
+        <ErrorNote title="Couldn't load your recently opened pull requests" message={recent.message} />
+      ) : (
+        <ul className={styles.requestList}>
+          {recent.items.map((item) => (
+            <li key={item.url}>
+              <button type="button" className={styles.request} disabled={disabled} onClick={() => onOpen(item.url)}>
+                <span className={styles.requestMain}>
+                  <span className={styles.requestTitle}>{item.title}</span>
+                  <span className={styles.requestMeta}>
+                    {item.ref.owner}/{item.ref.repo} #{item.ref.number} · {relativeTime(item.openedAt)}
+                  </span>
                 </span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }

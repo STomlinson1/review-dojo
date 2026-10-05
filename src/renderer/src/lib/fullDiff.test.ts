@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { Chapter, Diff, DiffFile, Hunk, Stop, Tour } from '../../../shared/types'
-import { fileSegments, firstHunkInDiff, lastStartingAtOrAbove, unchangedLinesBefore } from './fullDiff'
+import { stopIdsByHunk } from '../../../shared/tour'
+import type { Chapter, DiffFile, Hunk, Stop, Tour } from '../../../shared/types'
+import { fileSegments, lastStartingAtOrAbove, unchangedLinesBefore } from './fullDiff'
 
 const hunk = (id: string, path: string): Hunk => ({
   id,
@@ -44,19 +45,13 @@ const tourOf = (...stops: Stop[]): Tour => {
 
 describe('fileSegments', () => {
   it('groups consecutive hunks by owning stop and splits where ownership changes', () => {
-    const tour = tourOf(stop('S1', ['H1', 'H2', 'H4']), stop('S2', ['H3']))
-    const segments = fileSegments(file('a.ts', ['H1', 'H2', 'H3', 'H4']), tour)
-    expect(segments.map((segment) => [segment.stop?.id, segment.hunks.map((item) => item.id)])).toEqual([
-      ['S1', ['H1', 'H2']],
-      ['S2', ['H3']],
-      ['S1', ['H4']],
+    const owners = stopIdsByHunk(tourOf(stop('S1', ['H1', 'H2', 'H4']), stop('S2', ['H3'])))
+    expect(fileSegments(file('a.ts', ['H1', 'H2', 'H3', 'H4', 'H5']), owners)).toEqual([
+      { stopId: 'S1', start: 0, end: 2 },
+      { stopId: 'S2', start: 2, end: 3 },
+      { stopId: 'S1', start: 3, end: 4 },
+      { stopId: null, start: 4, end: 5 },
     ])
-  })
-
-  it('keeps the whole file in one unlabeled segment without a tour', () => {
-    const segments = fileSegments(file('a.ts', ['H1', 'H2']), null)
-    expect(segments).toHaveLength(1)
-    expect(segments[0].stop).toBeNull()
   })
 })
 
@@ -67,14 +62,6 @@ describe('unchangedLinesBefore', () => {
     Object.assign(changed.hunks[1], { newStart: 34, newLines: 7 })
     expect(unchangedLinesBefore(changed, changed.hunks[0])).toBe(25)
     expect(unchangedLinesBefore(changed, changed.hunks[1])).toBe(1)
-  })
-})
-
-describe('firstHunkInDiff', () => {
-  it('follows diff order rather than the order the stop lists its hunks', () => {
-    const diff: Diff = { mergeBaseSha: '', headSha: '', files: [file('a.ts', ['H1', 'H2']), file('b.ts', ['H3'])] }
-    expect(firstHunkInDiff(diff, ['H3', 'H2'])).toBe('H2')
-    expect(firstHunkInDiff(diff, [])).toBeNull()
   })
 })
 

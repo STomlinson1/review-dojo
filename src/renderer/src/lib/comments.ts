@@ -10,7 +10,7 @@ export interface CommentTarget {
   note: string | null
 }
 
-export const toDiffSide = (side: AnnotationSide): DiffSide => (side === 'deletions' ? 'LEFT' : 'RIGHT')
+const toDiffSide = (side: AnnotationSide): DiffSide => (side === 'deletions' ? 'LEFT' : 'RIGHT')
 export const toAnnotationSide = (side: DiffSide): AnnotationSide => (side === 'LEFT' ? 'deletions' : 'additions')
 
 /**
@@ -85,7 +85,7 @@ export function diffAnnotations(
  * Maps a line selection to the code a question is about. Unlike a comment it may include expanded
  * unchanged lines. A selection spanning both sides is read on the new side.
  */
-export function askSelection(range: SelectedLineRange, file: DiffFile): CodeSelection {
+export function selectionForAsk(range: SelectedLineRange, file: DiffFile): CodeSelection {
   const startSide = toDiffSide(range.side ?? 'additions')
   const endSide = toDiffSide(range.endSide ?? range.side ?? 'additions')
   const side = startSide === endSide ? endSide : 'RIGHT'

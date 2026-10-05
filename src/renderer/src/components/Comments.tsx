@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useRef } from 'react'
 import type { DraftComment } from '../../../shared/types'
 import { lineLabel } from '../lib/comments'
 import { useDojo } from '../store'
@@ -7,28 +7,65 @@ import styles from './Comments.module.css'
 import { Markdown } from './Markdown'
 
 interface CommentFormProps {
+  focusKey: string
   label: string
   note?: string | null
-  initialBody?: string
+  body: string
   submitLabel: string
   secondaryAction?: ReactNode
+  onBodyChange(body: string): void
   onSubmit(body: string): void
   onCancel(): void
 }
 
+let focusOnMount: string | null = null
+
+export function focusCommentFormOnMount(focusKey: string): void {
+  focusOnMount = focusKey
+}
+
 export function CommentForm({
+  focusKey,
   label,
   note,
-  initialBody = '',
+  body,
   submitLabel,
   secondaryAction,
+  onBodyChange,
   onSubmit,
   onCancel,
 }: CommentFormProps) {
-  const [body, setBody] = useState(initialBody)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const submit = () => {
     if (body.trim()) onSubmit(body.trim())
   }
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current
+    return () => {
+      // A diff can remount its annotations while the reviewer is typing; the form replacing this one takes over focus.
+      if (textarea === document.activeElement) focusOnMount = focusKey
+    }
+  }, [focusKey])
+
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea || focusOnMount !== focusKey) return
+    focusOnMount = null
+    const takeFocus = () => {
+      textarea.focus({ preventScroll: true })
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      return document.activeElement === textarea
+    }
+    if (takeFocus()) return
+    // A re-rendered diff slots the form in only after it has laid out the new patch, and an element
+    // that isn't rendered can't take focus. Waiting stops if the reviewer moves on meanwhile.
+    const rendered = new ResizeObserver(() => {
+      if (document.activeElement !== document.body || takeFocus()) rendered.disconnect()
+    })
+    rendered.observe(textarea)
+    return () => rendered.disconnect()
+  }, [focusKey])
 
   return (
     <form
@@ -41,12 +78,12 @@ export function CommentForm({
       <p className={styles.meta}>{label}</p>
       {note ? <p className={styles.note}>{note}</p> : null}
       <textarea
+        ref={textareaRef}
         rows={3}
         value={body}
         aria-label="Comment"
         placeholder="Leave a comment"
-        autoFocus
-        onChange={(event) => setBody(event.target.value)}
+        onChange={(event) => onBodyChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
@@ -74,20 +111,22 @@ export function CommentForm({
 }
 
 export function DraftCard({ draft }: { draft: DraftComment }) {
-  const [editing, setEditing] = useState(false)
-  const { updateDraft, deleteDraft } = useDojo.getState()
+  const editedBody = useDojo((state) => state.draftEdits[draft.id])
+  const { updateDraft, deleteDraft, setDraftEdit } = useDojo.getState()
 
-  if (editing) {
+  if (editedBody !== undefined) {
     return (
       <CommentForm
+        focusKey={draft.id}
         label={lineLabel(draft)}
-        initialBody={draft.body}
+        body={editedBody}
         submitLabel="Save"
+        onBodyChange={(body) => setDraftEdit(draft.id, body)}
         onSubmit={(body) => {
           updateDraft(draft.id, body)
-          setEditing(false)
+          setDraftEdit(draft.id, null)
         }}
-        onCancel={() => setEditing(false)}
+        onCancel={() => setDraftEdit(draft.id, null)}
       />
     )
   }
@@ -97,7 +136,14 @@ export function DraftCard({ draft }: { draft: DraftComment }) {
       <div className={styles.header}>
         <span className={styles.badge}>Draft</span>
         <span className={styles.meta}>{lineLabel(draft)}</span>
-        <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            focusCommentFormOnMount(draft.id)
+            setDraftEdit(draft.id, draft.body)
+          }}
+        >
           Edit
         </Button>
         <Button size="sm" variant="ghost" onClick={() => deleteDraft(draft.id)}>

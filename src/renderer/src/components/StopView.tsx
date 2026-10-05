@@ -8,7 +8,7 @@ import type {
 } from '../../../shared/types'
 import { formatLocation } from '../lib/codeRefs'
 import { EMPTY_PROGRESS, findStop, selectHunks, tourStops } from '../../../shared/tour'
-import { useDojo, usePreviewing, useSession, useSideBySide, useTour } from '../store'
+import { useDojo, usePreviewing, useSession, useTour } from '../store'
 import { ActivityLog } from './ActivityLog'
 import { Button } from './Button'
 import { ErrorNote } from './ErrorNote'
@@ -21,13 +21,12 @@ export function StopView({ stopId, showDiffs }: { stopId: string; showDiffs: boo
   const { diff, review } = useSession()
   const tour = useTour()
   const dojoMode = useDojo((state) => state.dojoMode)
-  const { fits: canShowFullDiff } = useSideBySide()
   const found = tour ? findStop(tour, stopId) : null
-  const hunkIds = found?.stop.hunkIds
+  const hunkIdsKey = found?.stop.hunkIds.join(' ') ?? ''
   const files = useMemo(() => {
-    const wanted = new Set(hunkIds)
+    const wanted = new Set(hunkIdsKey.split(' '))
     return selectHunks(diff, (hunk) => wanted.has(hunk.id))
-  }, [diff, hunkIds])
+  }, [diff, hunkIdsKey])
 
   if (!found) return <p className={styles.missing}>This stop isn't part of the current tour.</p>
   const { stop, chapter } = found
@@ -68,7 +67,7 @@ export function StopView({ stopId, showDiffs }: { stopId: string; showDiffs: boo
       ) : showDiffs ? (
         <section className={styles.diffs} aria-label="Changes in this stop">
           {files.map(({ file, hunks }) => (
-            <FileDiffView key={file.path} file={file} hunks={hunks} stopId={stop.id} linkToFullDiff={canShowFullDiff} />
+            <FileDiffView key={file.path} file={file} hunks={hunks} stopId={stop.id} />
           ))}
         </section>
       ) : null}

@@ -17,6 +17,7 @@ import { TourEmpty } from './TourEmpty'
 export function Review() {
   const hasTour = useDojo((state) => currentTour(state) !== null)
   const askOpen = useDojo((state) => state.askOpen)
+  const previewStartedAt = useDojo((state) => (tourPreview(state) ? state.tasks.tour?.startedAt : undefined))
   const sideBySide = useSideBySide().active
 
   useShortcuts()
@@ -25,7 +26,7 @@ export function Review() {
     <div className={styles.review}>
       <TopBar />
       <StatusBanner />
-      <PreviewStatus />
+      {previewStartedAt === undefined ? null : <PreviewStatus startedAt={previewStartedAt} />}
       <div className={styles.body} data-layout={sideBySide ? 'side-by-side' : 'focus'}>
         {hasTour ? <Sidebar /> : null}
         {sideBySide ? (
@@ -35,7 +36,7 @@ export function Review() {
           </>
         ) : (
           <>
-            <Guide showDiffs />
+            <StopPane showDiffs />
             {hasTour && askOpen ? <AskPanel /> : null}
           </>
         )}
@@ -46,29 +47,29 @@ export function Review() {
 
 function Narration() {
   const hasTour = useDojo((state) => currentTour(state) !== null)
-  const tab = useDojo((state) => state.narrationTab)
+  const askOpen = useDojo((state) => state.askOpen)
+  const asking = hasTour && askOpen
   const selectedStopId = useDojo((state) => state.selectedStopId)
-  const { setNarrationTab } = useDojo.getState()
-  const asking = hasTour && tab === 'ask'
+  const { setAskOpen } = useDojo.getState()
 
   return (
     <div className={styles.narration}>
       {hasTour ? (
         <div className={styles.tabs} role="group" aria-label="Narration">
-          <button type="button" aria-pressed={!asking} onClick={() => setNarrationTab('stop')}>
+          <button type="button" aria-pressed={!asking} onClick={() => setAskOpen(false)}>
             {selectedStopId ? 'Stop' : 'Overview'}
           </button>
-          <button type="button" aria-pressed={asking} onClick={() => setNarrationTab('ask')}>
+          <button type="button" aria-pressed={asking} onClick={() => setAskOpen(true)}>
             Ask
           </button>
         </div>
       ) : null}
-      {asking ? <AskPanel embedded /> : <Guide showDiffs={false} />}
+      {asking ? <AskPanel embedded /> : <StopPane showDiffs={false} />}
     </div>
   )
 }
 
-function Guide({ showDiffs }: { showDiffs: boolean }) {
+function StopPane({ showDiffs }: { showDiffs: boolean }) {
   const hasTour = useDojo((state) => currentTour(state) !== null)
   const selectedStopId = useDojo((state) => state.selectedStopId)
   const ref = useRef<HTMLElement>(null)
@@ -129,31 +130,26 @@ function StatusBanner() {
   return null
 }
 
-function PreviewStatus() {
+function PreviewStatus({ startedAt }: { startedAt: number }) {
   const stops = useDojo((state) => {
     const preview = tourPreview(state)
     return preview ? tourStops(preview).length : 0
   })
-  const startedAt = useDojo((state) => state.tasks.tour?.startedAt)
+  const elapsed = useElapsed(startedAt)
   const { cancelTask } = useDojo.getState()
-  if (stops === 0 || startedAt === undefined) return null
 
   return (
-    <div className={styles.banner} role="status">
+    <div className={styles.banner}>
       <Pulse />
-      <span className={styles.bannerText}>
+      <span className={styles.bannerText} role="status">
         Still writing the tour: {stops} {stops === 1 ? 'stop' : 'stops'} so far
       </span>
-      <Elapsed since={startedAt} />
+      <span className={styles.bannerMeta}>{formatElapsed(elapsed)}</span>
       <Button size="sm" variant="ghost" onClick={() => cancelTask('tour')}>
         Cancel
       </Button>
     </div>
   )
-}
-
-function Elapsed({ since }: { since: number }) {
-  return <span className={styles.bannerMeta}>{formatElapsed(useElapsed(since))}</span>
 }
 
 function useShortcuts() {
@@ -175,8 +171,7 @@ function useShortcuts() {
       else if (event.key === 'u' && stopId) {
         state.updateStop(stopId, { understood: !state.session.review.stops[stopId]?.understood })
       } else if (event.key === '/') state.focusAsk()
-      else if (event.key === 'Escape' && sideBySide && state.narrationTab === 'ask') state.setNarrationTab('stop')
-      else if (event.key === 'Escape' && !sideBySide && state.askOpen) state.setAskOpen(false)
+      else if (event.key === 'Escape' && state.askOpen) state.setAskOpen(false)
       else return
       event.preventDefault()
     }

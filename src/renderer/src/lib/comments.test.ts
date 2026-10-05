@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DiffFile, DraftComment, Hunk, ReviewThread } from '../../../shared/types'
-import { askSelection, commentTarget, diffAnnotations } from './comments'
+import { selectionForAsk, commentTarget, diffAnnotations } from './comments'
 
 const hunks: Hunk[] = [
   {
@@ -123,9 +123,9 @@ describe('diffAnnotations', () => {
   })
 })
 
-describe('askSelection', () => {
+describe('selectionForAsk', () => {
   it('orders an old-side selection and keeps the file path for the engine to map', () => {
-    expect(askSelection({ start: 12, end: 10, side: 'deletions' }, file)).toEqual({
+    expect(selectionForAsk({ start: 12, end: 10, side: 'deletions' }, file)).toEqual({
       path: 'b.ts',
       side: 'LEFT',
       startLine: 10,
@@ -134,11 +134,14 @@ describe('askSelection', () => {
   })
 
   it('keeps expanded unchanged lines that a comment could not target', () => {
-    expect(askSelection({ start: 20, end: 25, side: 'additions' }, file)).toMatchObject({ startLine: 20, endLine: 25 })
+    expect(selectionForAsk({ start: 20, end: 25, side: 'additions' }, file)).toMatchObject({
+      startLine: 20,
+      endLine: 25,
+    })
   })
 
   it('reads a selection across both sides on the new side', () => {
-    expect(askSelection({ start: 11, side: 'deletions', end: 42, endSide: 'additions' }, file)).toEqual({
+    expect(selectionForAsk({ start: 11, side: 'deletions', end: 42, endSide: 'additions' }, file)).toEqual({
       path: 'b.ts',
       side: 'RIGHT',
       startLine: 11,
