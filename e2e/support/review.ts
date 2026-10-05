@@ -20,7 +20,7 @@ export const fileCard = (page: Page, path: string): Locator =>
 export const tourNav = (page: Page): Locator => page.getByRole('navigation', { name: 'Tour' })
 
 export const tourStop = (page: Page, title: string): Locator =>
-  tourNav(page).getByRole('button', { name: new RegExp(title) })
+  tourNav(page).getByRole('button', { name: title })
 
 export const reviewDrawer = (page: Page): Locator => page.getByRole('dialog', { name: 'Review' })
 
