@@ -27,7 +27,9 @@ function remoteEnds(pids: number[]): string[] {
     listing = execFileSync('lsof', ['-nP', '-iTCP', '-a', '-p', pids.join(',')], { encoding: 'utf8' })
   } catch (error) {
     // lsof exits 1 when a listed process has no sockets or has already gone; what it printed still counts.
-    listing = String((error as { stdout?: string }).stdout ?? '')
+    const failure = error as { status?: number | null; stdout?: string }
+    if (failure.status !== 1) throw error
+    listing = String(failure.stdout ?? '')
   }
   return listing
     .split('\n')
@@ -45,13 +47,24 @@ if (!command) {
 const child = spawn(command, args, { stdio: 'inherit' })
 const seen = new Set<string>()
 let samples = 0
+let unableToSample: Error | null = null
 const timer = setInterval(() => {
-  samples += 1
-  for (const end of remoteEnds(processTree(child.pid!))) seen.add(end)
+  try {
+    samples += 1
+    for (const end of remoteEnds(processTree(child.pid!))) seen.add(end)
+  } catch (error) {
+    unableToSample = error as Error
+    clearInterval(timer)
+    child.kill()
+  }
 }, SAMPLE_MS)
 
 child.on('exit', (code) => {
   clearInterval(timer)
+  if (unableToSample) {
+    console.error(`outbound-watch: could not sample connections, stopped the command: ${unableToSample.message}`)
+    process.exit(1)
+  }
   console.log(`outbound-watch: ${samples} samples, ${seen.size} connections beyond loopback`)
   for (const end of seen) console.log(`  ${end}`)
   process.exit(code !== 0 ? (code ?? 1) : seen.size > 0 ? 1 : 0)

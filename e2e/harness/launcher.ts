@@ -71,6 +71,16 @@ export function prepareRun(dir: string, mockUrl: string, settings: Settings = SE
   return run
 }
 
+export function gitEnv(remotes: string): Record<string, string> {
+  return {
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: `url.file://${remotes}/.insteadOf`,
+    GIT_CONFIG_VALUE_0: 'https://github.com/',
+  }
+}
+
 export function appEnv(run: Run, mockUrl: string, remotes: string): Record<string, string> {
   return {
     PATH: `${BIN}:/usr/bin:/bin`,
@@ -91,11 +101,7 @@ export function appEnv(run: Run, mockUrl: string, remotes: string): Record<strin
     HTTPS_PROXY: mockUrl,
     ALL_PROXY: mockUrl,
     NO_PROXY: '127.0.0.1,localhost',
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_NOSYSTEM: '1',
-    GIT_CONFIG_COUNT: '1',
-    GIT_CONFIG_KEY_0: `url.file://${remotes}/.insteadOf`,
-    GIT_CONFIG_VALUE_0: 'https://github.com/',
+    ...gitEnv(remotes),
   }
 }
 

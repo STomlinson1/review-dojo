@@ -2,6 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { json } from '../harness/gh'
+import { gitEnv } from '../harness/launcher'
+import { MANIFEST } from '../harness/paths'
+import { readManifest } from '../harness/remotes'
 import { prView, pullRequest, stackEntry, threads } from '../harness/world'
 import { commentBox, diffCode, startComment } from '../support/diff'
 import { fileCard, fullDiff, openPullRequest } from '../support/review'
@@ -24,7 +27,8 @@ test('an opened pull request shows the diff of its head against its base', async
 
   expect(existsSync(join(dojo.run.userData, 'worktrees/acme/widget', pr.headSha, 'src/farewell.ts'))).toBe(true)
   const clone = join(dojo.run.userData, 'repos/acme/widget')
-  const git = (...args: string[]) => execFileSync('git', ['-C', clone, ...args], { encoding: 'utf8' }).trim()
+  const env = { ...process.env, ...gitEnv(readManifest(MANIFEST).remotes), GIT_NO_LAZY_FETCH: '1' }
+  const git = (...args: string[]) => execFileSync('git', ['-C', clone, ...args], { encoding: 'utf8', env }).trim()
   const rewordedReadme = git('rev-parse', `${pr.baseSha}:README.md`)
   expect(git('rev-list', '--objects', '--missing=print', '--all')).toContain(`?${rewordedReadme}`)
 })

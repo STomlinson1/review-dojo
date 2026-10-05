@@ -16,7 +16,7 @@ const meter = (page: Page) => page.getByRole('progressbar', { name: 'Stops under
 test('stops are visited in tour order with the footer and the keyboard', async ({ dojo }) => {
   const page = await openTour(dojo)
   await tourStop(page, 'Friendlier greeting').click()
-  await expect(page.getByRole('heading', { level: 1, name: 'Friendlier greeting' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friendlier greeting', exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Next →' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Farewell helper' })).toBeVisible()
@@ -26,7 +26,7 @@ test('stops are visited in tour order with the footer and the keyboard', async (
   await expect(page.getByRole('heading', { level: 1, name: 'Double helper' })).toBeVisible()
   await page.keyboard.press('k')
   await page.keyboard.press('k')
-  await expect(page.getByRole('heading', { level: 1, name: 'Friendlier greeting' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: 'Friendlier greeting', exact: true })).toBeVisible()
   await page.getByRole('button', { name: '← Overview' }).click()
   await expect(page.getByRole('heading', { level: 1, name: 'Friendlier greetings' })).toBeVisible()
 })
