@@ -198,14 +198,18 @@ export async function startMock(logPath: string): Promise<Mock> {
   const log = (entry: Record<string, unknown>) => appendFileSync(logPath, `${JSON.stringify(entry)}\n`)
 
   // 400 makes both CLIs give up at once; they retry 5xx and 429 with backoff.
-  const reject = (response: ServerResponse, status: number, why: string) => {
+  const reject = (response: ServerResponse, status: number, why: string): void => {
     unexpected.push(why)
     log({ unexpected: why })
+    if (response.headersSent) {
+      response.destroy()
+      return
+    }
     response.writeHead(status, { 'content-type': 'application/json' })
     response.end(JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: `mock: ${why}` } }))
   }
 
-  const server = http.createServer(async (request, response) => {
+  const handle = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
     const raw = await readBody(request)
     const method = request.method ?? ''
     const url = request.url ?? ''
@@ -250,6 +254,17 @@ export async function startMock(logPath: string): Promise<Mock> {
     log({ served: hit.route, expect: turn.expect })
     const finish = await hit.reply(response, body, turn, (served += 1))
     if (finish) held.push(finish)
+  }
+
+  // A rejection escaping the request handler would end the process that owns the mock.
+  const server = http.createServer((request, response) => {
+    handle(request, response).catch((error: unknown) =>
+      reject(
+        response,
+        400,
+        `${request.method} ${request.url} failed: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    )
   })
 
   server.on('connection', (socket) => {

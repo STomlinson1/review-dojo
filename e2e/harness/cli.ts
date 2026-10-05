@@ -37,9 +37,24 @@ function readSession(dir: string): Session {
   return JSON.parse(readFileSync(sessionPath(dir), 'utf8')) as Session
 }
 
+function isTurn(value: unknown): value is Turn {
+  if (typeof value !== 'object' || value === null) return false
+  const { provider, expect, text, tool } = value as Record<string, unknown>
+  if ((provider !== 'claude' && provider !== 'codex') || typeof expect !== 'string') return false
+  if (typeof text === 'string') return true
+  const { name, input } = (tool ?? {}) as Record<string, unknown>
+  return typeof name === 'string' && typeof input === 'object' && input !== null
+}
+
 function parseTurns(body: string): Turn[] {
   const turns: unknown = body ? JSON.parse(body) : undefined
   if (!Array.isArray(turns)) throw new Error(`turns needs a JSON array of Turn objects, got: ${body || 'nothing'}`)
+  const bad = turns.findIndex((turn) => !isTurn(turn))
+  if (bad !== -1) {
+    throw new Error(
+      `turns[${bad}] is not a Turn (provider claude|codex, expect, and text or tool {name, input}): ${JSON.stringify(turns[bad])}`,
+    )
+  }
   return turns as Turn[]
 }
 
