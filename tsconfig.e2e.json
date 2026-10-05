@@ -1,0 +1,12 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": ["e2e/**/*.ts", "e2e/**/*.cjs", "src/shared/**/*"],
+  "exclude": ["src/shared/**/*.test.ts", "e2e/.artifacts"],
+  "compilerOptions": {
+    "composite": true,
+    "noImplicitAny": true,
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["node"]
+  }
+}

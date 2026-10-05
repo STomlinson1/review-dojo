@@ -1,0 +1,2 @@
+#!/bin/sh
+printf '__DOJO_PATH__%s__DOJO_PATH__' "$PATH"

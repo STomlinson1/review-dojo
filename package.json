@@ -9,15 +9,17 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.e2e.json",
     "test": "vitest run",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "cli": "tsx src/cli.ts",
     "package": "electron-vite build && electron-builder --mac",
-    "format": "prettier --write src electron.vite.config.ts"
+    "format": "prettier --write src e2e electron.vite.config.ts"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@pierre/diffs": "^1.5.1",
+    "@playwright/test": "1.63.0",
     "@types/node": "^24.19.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

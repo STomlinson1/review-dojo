@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "$DOJO_E2E_NODE" --experimental-strip-types --disable-warning=ExperimentalWarning "$(dirname "$0")/../gh-fake.ts" "$@"
