@@ -62,6 +62,8 @@ test('a Codex tour in the wrong shape is corrected in a second turn', async ({ d
 
   await expect(finishedTour(page)).toBeVisible()
   await expect(page.getByRole('alert')).toHaveCount(0)
+  const [tourRequest, repairRequest] = dojo.mock.requests
+  expect(repairRequest.headers['session-id']).toBe(tourRequest.headers['session-id'])
 })
 
 test('cancelling a Codex tour stops the agent and reports nothing', async ({ dojo }) => {
