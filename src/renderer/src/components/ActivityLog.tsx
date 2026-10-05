@@ -20,7 +20,7 @@ export function ActivityLog({ task, label, limit = 8, quiet = false, onCancel }:
   const firstIndex = task.eventCount - recent.length
 
   return (
-    <div className={styles.log} data-quiet={quiet}>
+    <div className={styles.log} role="group" aria-label={label} data-quiet={quiet}>
       <div className={styles.header}>
         <Pulse />
         <span className={styles.label} role="status">

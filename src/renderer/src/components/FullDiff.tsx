@@ -99,7 +99,7 @@ const FileCard = memo(function FileCard({ file, owners, selectedStopId, changedS
   const collapsed = file.isGenerated && !generatedShown
 
   return (
-    <article className={styles.file} data-file data-hunks={hunkIds(file.hunks)}>
+    <article className={styles.file} aria-label={file.path} data-file data-hunks={hunkIds(file.hunks)}>
       <header className={styles.fileHeader}>
         <span className={styles.path} title={file.path}>
           {file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}

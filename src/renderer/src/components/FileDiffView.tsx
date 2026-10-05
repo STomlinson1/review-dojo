@@ -188,6 +188,7 @@ function ComposerForm({ path, target, secondaryAction, onSubmit }: ComposerFormP
   return (
     <CommentForm
       focusKey={composerFocusKey(path)}
+      name={`New comment on ${path} ${lineLabel(target)}`}
       label={lineLabel(target)}
       note={target.note}
       body={body}

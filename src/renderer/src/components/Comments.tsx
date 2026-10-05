@@ -8,6 +8,7 @@ import { Markdown } from './Markdown'
 
 interface CommentFormProps {
   focusKey: string
+  name: string
   label: string
   note?: string | null
   body: string
@@ -26,6 +27,7 @@ export function focusCommentFormOnMount(focusKey: string): void {
 
 export function CommentForm({
   focusKey,
+  name,
   label,
   note,
   body,
@@ -70,6 +72,7 @@ export function CommentForm({
   return (
     <form
       className={styles.card}
+      aria-label={name}
       onSubmit={(event) => {
         event.preventDefault()
         submit()
@@ -118,6 +121,7 @@ export function DraftCard({ draft }: { draft: DraftComment }) {
     return (
       <CommentForm
         focusKey={draft.id}
+        name={`Edit draft comment on ${draft.path} ${lineLabel(draft)}`}
         label={lineLabel(draft)}
         body={editedBody}
         submitLabel="Save"
@@ -132,7 +136,7 @@ export function DraftCard({ draft }: { draft: DraftComment }) {
   }
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} role="group" aria-label={`Draft comment on ${draft.path} ${lineLabel(draft)}`}>
       <div className={styles.header}>
         <span className={styles.badge}>Draft</span>
         <span className={styles.meta}>{lineLabel(draft)}</span>
