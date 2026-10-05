@@ -26,6 +26,9 @@ src/cli.ts     `review-dojo tour <pr-url>` — runs the engine headless and prin
 src/main       Electron main: window, IPC handlers that delegate to the engine, key storage.
 src/preload    contextBridge exposing the typed `DojoApi`.
 src/renderer   React UI.
+e2e/harness    Hermetic launcher and stand-ins for every process boundary (gh, git remotes, model APIs, keychain).
+e2e/support    Playwright fixture and page helpers.
+e2e/specs      End-to-end specs (*.e2e.ts), one file per flow group.
 ```
 
 ### Data flow
@@ -51,3 +54,23 @@ src/renderer   React UI.
 
 Each provider runs a read-only agent in the worktree and supports both API-key and subscription
 auth. See `src/engine/providers`.
+
+### End-to-end tests
+
+The suite launches the built app (never the dev server, so the `app://` origin and the IPC sender check are
+real) and replaces what lies beyond each process boundary, through the environment and a per-test user data
+directory only; `src/` has no test-only branch.
+
+- **GitHub:** a fake `gh` first on `PATH` replays replies scripted per test, keyed on the exact argument shape,
+  logs every call with its stdin, and fails anything unscripted. `SHELL` is a stub so login-shell `PATH`
+  adoption cannot reorder it.
+- **Git:** real `git`; `https://github.com/` is rewritten to bare repositories built for the run.
+- **Models:** the real bundled `claude` and `codex` binaries talk to one local mock of both APIs, scripted as a
+  queue of turns. The mock is also the proxy for every process, so any connection beyond loopback is refused,
+  recorded, and fails the test.
+- **Keychain:** a `security` stand-in on `PATH` finds nothing, so the Claude CLI's credential lookup never
+  reaches the login keychain.
+- **Main process:** two preloads keep the window from taking focus and record `shell.openExternal` calls.
+
+Every test gets its own run directory and asserts what the user sees and what reached `gh`. `npm run e2e:app`
+runs the same launcher detached for agent-driven verification.

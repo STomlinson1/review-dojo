@@ -39,7 +39,7 @@ Nothing runs on a server. Traffic goes only to GitHub and to the model provider 
 
 ## Requirements
 
-- macOS on Apple silicon or Intel, Node 22+.
+- macOS on Apple silicon or Intel, Node 22.6+.
 - [GitHub CLI](https://cli.github.com), signed in: `gh auth login`.
 - One model provider, either:
   - **Claude** with an Anthropic API key, or your own Claude subscription via `claude auth login`.
@@ -75,5 +75,12 @@ See [docs/DESIGN.md](docs/DESIGN.md). Clones, worktrees, tours and review progre
 
 ```sh
 npm test             # unit tests
+npm run test:e2e     # end-to-end tests: builds the app, then drives it with every outside service replaced
 npm run typecheck
 ```
+
+The end-to-end suite never contacts GitHub or a model provider and does not use your `gh`, `claude` or `codex`
+logins. After `npm install`, run `node node_modules/electron/install.js` once: Electron downloads its binary on
+first use, and this keeps that download out of the suite. `npm run e2e:app` starts the same hermetic app for
+driving by hand or by an agent; see [.claude/skills/verify/SKILL.md](.claude/skills/verify/SKILL.md). The
+Settings "Save key" flow is not covered: it would write to the login keychain.
