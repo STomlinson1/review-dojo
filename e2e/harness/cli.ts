@@ -37,6 +37,12 @@ function readSession(dir: string): Session {
   return JSON.parse(readFileSync(sessionPath(dir), 'utf8')) as Session
 }
 
+function parseTurns(body: string): Turn[] {
+  const turns: unknown = body ? JSON.parse(body) : undefined
+  if (!Array.isArray(turns)) throw new Error(`turns needs a JSON array of Turn objects, got: ${body || 'nothing'}`)
+  return turns as Turn[]
+}
+
 async function waitFor<T>(what: string, read: () => T | null | undefined, timeoutMs = 20_000): Promise<T> {
   const deadline = Date.now() + timeoutMs
   for (;;) {
@@ -80,8 +86,13 @@ async function host(dir: string): Promise<void> {
       let body = ''
       request.on('data', (chunk) => (body += chunk))
       request.on('end', () => {
-        if (request.url === '/turns') mock.script(...(JSON.parse(body) as Turn[]))
-        else if (request.url === '/release') mock.release(body)
+        try {
+          if (request.url === '/turns') mock.script(...parseTurns(body))
+          else if (request.url === '/release') mock.release(body)
+        } catch (error) {
+          response.writeHead(400).end(error instanceof Error ? error.message : String(error))
+          return
+        }
         response.end(
           JSON.stringify({ unexpected: mock.unexpected, blocked: mock.blocked, pendingTurns: mock.pending() }),
         )
@@ -118,13 +129,26 @@ function isRunning(pid: number): boolean {
   }
 }
 
+function stop(dir: string): void {
+  const session = readSession(dir)
+  if (isRunning(session.hostPid)) {
+    process.kill(session.hostPid, 'SIGTERM')
+    return
+  }
+  // A host that died never removed its session file or stopped its app.
+  if (isRunning(session.appPid)) process.kill(session.appPid)
+  rmSync(sessionPath(dir))
+}
+
+function usage(): never {
+  console.error(USAGE)
+  process.exit(1)
+}
+
 async function start(dir: string): Promise<void> {
   if (existsSync(sessionPath(dir))) {
-    const stale = readSession(dir)
-    if (isRunning(stale.hostPid)) throw new Error(`An app is already running for ${dir}. Stop it first.`)
-    // A host that was killed outright never removed its session file or stopped its app.
-    if (isRunning(stale.appPid)) process.kill(stale.appPid)
-    rmSync(sessionPath(dir))
+    if (isRunning(readSession(dir).hostPid)) throw new Error(`An app is already running for ${dir}. Stop it first.`)
+    stop(dir)
   }
   const child = spawn(process.execPath, [...process.execArgv, import.meta.filename, 'host', dir], {
     detached: true,
@@ -169,7 +193,7 @@ async function state(dir: string): Promise<void> {
 
 async function main(): Promise<void> {
   const [command, dirArgument, ...rest] = process.argv.slice(2)
-  if (!command || !dirArgument) throw new Error(USAGE)
+  if (!command || !dirArgument) usage()
   const dir = resolve(dirArgument)
   if (command === 'host') await host(dir)
   else if (command === 'start') await start(dir)
@@ -179,8 +203,8 @@ async function main(): Promise<void> {
   else if (command === 'gh')
     new Gh(runPaths(dir).ghScript, runPaths(dir).ghLog).set(rest[0], JSON.parse(rest[1]) as GhReply)
   else if (command === 'state') await state(dir)
-  else if (command === 'stop') process.kill(readSession(dir).hostPid, 'SIGTERM')
-  else throw new Error(USAGE)
+  else if (command === 'stop') stop(dir)
+  else usage()
 }
 
 main().catch((error: unknown) => {
