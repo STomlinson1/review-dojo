@@ -1,10 +1,15 @@
-import { type SpawnSyncReturns, spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { type SpawnSyncReturns, execFileSync, spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { REPO } from '../harness/paths'
 
 const cli = (...args: string[]): SpawnSyncReturns<string> =>
   spawnSync('npm', ['run', '--silent', 'e2e:app', '--', ...args], { cwd: REPO, encoding: 'utf8' })
+
+/** A signalled child stays a zombie that `kill -0` accepts until it is reaped, so `ps` says whether it died. */
+const processState = (pid: number): string =>
+  execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
 
 const gone = (pid: number): boolean => {
   try {
@@ -29,8 +34,6 @@ const BAD_TURNS: [string[], string][] = [
   [['[{"provider":"claude","expect":"x","text":"y"},{"provider":"claude","expect":"x"}]'], 'turns[1]'],
 ]
 
-// failure means: a bad turns argument gets past the control server, so an agent's typo kills the host and
-// strands the app with no message, and every later command fails with fetch failed
 test('malformed turns are refused with a message while the app stays up', async ({}, testInfo) => {
   test.setTimeout(60_000)
   const dir = testInfo.outputPath('run')
@@ -45,15 +48,33 @@ test('malformed turns are refused with a message while the app stays up', async 
     }
     const state = cli('state', dir)
     expect(state.stderr).toBe('')
-    expect(JSON.parse(state.stdout)).toMatchObject({ unexpected: [], pendingTurns: 0 })
+    expect(JSON.parse(state.stdout)).toMatchObject({ unexpected: [], ghUnscripted: [], pendingTurns: 0 })
   } finally {
     await stopAndWait(dir, [session.hostPid, session.appPid])
   }
   expect(existsSync(`${dir}/session.json`)).toBe(false)
 })
 
-// failure means: the usage text no longer names every command, so an agent following it cannot discover stop
-// and leaves the app running
+test("stop leaves a process alone when a stale session names a pid that is not this run's app", async ({}, testInfo) => {
+  const dir = testInfo.outputPath('run')
+  mkdirSync(dir, { recursive: true })
+  const deadHost = spawnSync('true').pid
+  const bystander = spawn('sleep', ['60'])
+  try {
+    writeFileSync(
+      join(dir, 'session.json'),
+      JSON.stringify({ hostPid: deadHost, appPid: bystander.pid, cdpPort: 1, controlPort: 1 }),
+    )
+
+    expect(cli('stop', dir).status).toBe(0)
+
+    expect(processState(bystander.pid!)).toMatch(/^S/)
+    expect(existsSync(join(dir, 'session.json'))).toBe(false)
+  } finally {
+    bystander.kill()
+  }
+})
+
 test('the usage text lists every command', () => {
   const result = cli()
   expect(result.status).toBe(1)

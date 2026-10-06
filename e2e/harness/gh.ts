@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 
 export interface GhReply {
   stdout?: string
@@ -28,7 +28,7 @@ export class Gh {
     readonly logPath: string,
   ) {
     this.script = existsSync(scriptPath) ? JSON.parse(readFileSync(scriptPath, 'utf8')) : {}
-    this.write()
+    if (!existsSync(scriptPath)) this.write()
   }
 
   set(route: string, reply: GhReply): void {
@@ -49,7 +49,10 @@ export class Gh {
     return this.calls().filter((call) => call.unscripted)
   }
 
+  /** The fake gh reads this file while the app runs, so it must never see a half-written one. */
   private write(): void {
-    writeFileSync(this.scriptPath, JSON.stringify(this.script, null, 2))
+    const staging = `${this.scriptPath}.${process.pid}.tmp`
+    writeFileSync(staging, JSON.stringify(this.script, null, 2))
+    renameSync(staging, this.scriptPath)
   }
 }

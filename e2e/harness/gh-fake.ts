@@ -1,11 +1,5 @@
 import { appendFileSync, readFileSync } from 'node:fs'
-
-interface Reply {
-  stdout?: string
-  stderr?: string
-  exit?: number
-  delayMs?: number
-}
+import type { GhCall, GhReply } from './gh'
 
 const ROUTES: [RegExp, (match: RegExpExecArray) => string][] = [
   [/^api user --jq \.login$/, () => 'user'],
@@ -46,8 +40,8 @@ function readAll(stream: NodeJS.ReadStream): Promise<string> {
   })
 }
 
-const scriptPath = process.env.DOJO_E2E_GH_SCRIPT
-const logPath = process.env.DOJO_E2E_GH_LOG
+const scriptPath = process.env.DOJO_E2E_GH_SCRIPT ?? ''
+const logPath = process.env.DOJO_E2E_GH_LOG ?? ''
 if (!scriptPath || !logPath) {
   process.stderr.write('fake gh: DOJO_E2E_GH_SCRIPT and DOJO_E2E_GH_LOG must be set\n')
   process.exit(2)
@@ -56,17 +50,28 @@ if (!scriptPath || !logPath) {
 const argv = process.argv.slice(2)
 const stdin = await readAll(process.stdin)
 const route = routeOf(argv)
-const script = JSON.parse(readFileSync(scriptPath, 'utf8')) as Record<string, Reply>
-const reply = route === null ? undefined : script[route]
 
-if (!reply) {
-  appendFileSync(logPath, `${JSON.stringify({ route, argv, stdin, exit: 1, unscripted: true })}\n`)
-  process.stderr.write(`fake gh: unscripted call: gh ${argv.join(' ')}\n`)
+function log(call: GhCall): void {
+  appendFileSync(logPath, `${JSON.stringify(call)}\n`)
+}
+
+function refuse(why: string): never {
+  log({ route, argv, stdin, exit: 1, unscripted: true })
+  process.stderr.write(`fake gh: ${why}: gh ${argv.join(' ')}\n`)
   process.exit(1)
 }
 
+let script: Record<string, GhReply>
+try {
+  script = JSON.parse(readFileSync(scriptPath, 'utf8')) as Record<string, GhReply>
+} catch (error) {
+  refuse(`could not read the script at ${scriptPath} (${error instanceof Error ? error.message : String(error)})`)
+}
+const reply = route === null ? undefined : script[route]
+if (!reply) refuse('unscripted call')
+
 const exit = reply.exit ?? 0
-appendFileSync(logPath, `${JSON.stringify({ route, argv, stdin, exit, unscripted: false })}\n`)
+log({ route, argv, stdin, exit, unscripted: false })
 if (reply.delayMs) await new Promise((resolve) => setTimeout(resolve, reply.delayMs))
 process.stdout.write(reply.stdout ?? '')
 process.stderr.write(reply.stderr ?? '')

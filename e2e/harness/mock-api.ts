@@ -181,7 +181,8 @@ const ROUTES: { route: ProviderRoute; path: RegExp; reply: typeof claudeReply }[
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
     let raw = ''
-    request.on('data', (chunk) => (raw += chunk))
+    request.setEncoding('utf8')
+    request.on('data', (chunk: string) => (raw += chunk))
     request.on('end', () => resolve(raw))
   })
 }

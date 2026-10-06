@@ -1,5 +1,5 @@
-import { type ChildProcess, spawn } from 'node:child_process'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join, resolve } from 'node:path'
@@ -35,6 +35,20 @@ const sessionPath = (dir: string) => join(dir, 'session.json')
 function readSession(dir: string): Session {
   if (!existsSync(sessionPath(dir))) throw new Error(`No app is running for ${dir}. Start one with: start ${dir}`)
   return JSON.parse(readFileSync(sessionPath(dir), 'utf8')) as Session
+}
+
+/** `start` polls for this file, so it must never see a half-written one. */
+function writeSession(dir: string, session: Session): void {
+  const staging = join(dir, `session.${process.pid}.tmp`)
+  writeFileSync(staging, JSON.stringify(session))
+  renameSync(staging, sessionPath(dir))
+}
+
+/** Chromium creates the port file before writing it, so an empty or partial read is not a port yet. */
+function readPort(portFile: string): number | null {
+  if (!existsSync(portFile)) return null
+  const port = Number(readFileSync(portFile, 'utf8').split('\n')[0])
+  return port > 0 ? port : null
 }
 
 function isTurn(value: unknown): value is Turn {
@@ -86,53 +100,43 @@ async function host(dir: string): Promise<void> {
   signedIn(gh)
   pullRequest(gh, manifest.prs.widget)
 
+  const portFile = join(run.userData, 'DevToolsActivePort')
+  rmSync(portFile, { force: true })
   const app: ChildProcess = spawn(ELECTRON, [...appArgs(run, mock.url), '--remote-debugging-port=0'], {
     env: appEnv(run, mock.url, manifest.remotes),
     stdio: 'ignore',
   })
-  try {
-    const portFile = join(run.userData, 'DevToolsActivePort')
-    rmSync(portFile, { force: true })
-    const cdpPort = await waitFor('the app to open its debugging port', () =>
-      existsSync(portFile) ? Number(readFileSync(portFile, 'utf8').split('\n')[0]) : null,
-    )
-
-    const server = http.createServer((request, response) => {
-      let body = ''
-      request.on('data', (chunk) => (body += chunk))
-      request.on('end', () => {
-        try {
-          if (request.url === '/turns') mock.script(...parseTurns(body))
-          else if (request.url === '/release') mock.release(body)
-        } catch (error) {
-          response.writeHead(400).end(error instanceof Error ? error.message : String(error))
-          return
-        }
-        response.end(
-          JSON.stringify({ unexpected: mock.unexpected, blocked: mock.blocked, pendingTurns: mock.pending() }),
-        )
-      })
-    })
-    await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
-    const session: Session = {
-      hostPid: process.pid,
-      appPid: app.pid!,
-      cdpPort,
-      controlPort: (server.address() as AddressInfo).port,
-    }
-    writeFileSync(sessionPath(dir), JSON.stringify(session))
-
-    const shutdown = () => {
-      rmSync(sessionPath(dir), { force: true })
-      app.kill()
-      process.exit(0)
-    }
-    app.on('exit', shutdown)
-    process.on('SIGTERM', shutdown)
-  } catch (error) {
-    app.kill()
-    throw error
+  process.on('exit', () => void app.kill())
+  const shutdown = () => {
+    rmSync(sessionPath(dir), { force: true })
+    process.exit(0)
   }
+  app.on('exit', shutdown)
+  process.on('SIGTERM', shutdown)
+
+  const cdpPort = await waitFor('the app to open its debugging port', () => readPort(portFile))
+  const server = http.createServer((request, response) => {
+    let body = ''
+    request.setEncoding('utf8')
+    request.on('data', (chunk: string) => (body += chunk))
+    request.on('end', () => {
+      try {
+        if (request.url === '/turns') mock.script(...parseTurns(body))
+        else if (request.url === '/release') mock.release(body)
+      } catch (error) {
+        response.writeHead(400).end(error instanceof Error ? error.message : String(error))
+        return
+      }
+      response.end(JSON.stringify({ unexpected: mock.unexpected, blocked: mock.blocked, pendingTurns: mock.pending() }))
+    })
+  })
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done))
+  writeSession(dir, {
+    hostPid: process.pid,
+    appPid: app.pid!,
+    cdpPort,
+    controlPort: (server.address() as AddressInfo).port,
+  })
 }
 
 function isRunning(pid: number): boolean {
@@ -144,6 +148,13 @@ function isRunning(pid: number): boolean {
   }
 }
 
+/** A pid from a stale session file may belong to anything by now. */
+function isThisRunsApp(pid: number, dir: string): boolean {
+  if (!isRunning(pid)) return false
+  const command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' })
+  return command.includes('Electron') && command.includes(runPaths(dir).userData)
+}
+
 function stop(dir: string): void {
   const session = readSession(dir)
   if (isRunning(session.hostPid)) {
@@ -151,7 +162,7 @@ function stop(dir: string): void {
     return
   }
   // A host that died never removed its session file or stopped its app.
-  if (isRunning(session.appPid)) process.kill(session.appPid)
+  if (isThisRunsApp(session.appPid, dir)) process.kill(session.appPid)
   rmSync(sessionPath(dir))
 }
 
@@ -170,8 +181,13 @@ async function start(dir: string): Promise<void> {
     stdio: 'ignore',
   })
   child.unref()
-  const session = await waitFor('the app to start', () => (existsSync(sessionPath(dir)) ? readSession(dir) : null))
-  console.log(JSON.stringify({ ...session, runDir: dir }))
+  try {
+    const session = await waitFor('the app to start', () => (existsSync(sessionPath(dir)) ? readSession(dir) : null))
+    console.log(JSON.stringify({ ...session, runDir: dir }))
+  } catch (error) {
+    child.kill()
+    throw error
+  }
 }
 
 async function step(dir: string, body: string): Promise<void> {

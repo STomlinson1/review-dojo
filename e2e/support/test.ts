@@ -41,8 +41,11 @@ export const test = base.extend<{ dojo: Dojo; provider: ProviderId }>({
       if (!app) return
       const closing = app
       app = null
-      await closing.context().tracing.stop({ path: testInfo.outputPath(`trace-${Date.now()}.zip`) })
-      await closing.close()
+      try {
+        await closing.context().tracing.stop({ path: testInfo.outputPath(`trace-${Date.now()}.zip`) })
+      } finally {
+        await closing.close()
+      }
     }
 
     const launch = async () => {
@@ -73,23 +76,26 @@ export const test = base.extend<{ dojo: Dojo; provider: ProviderId }>({
     if (testInfo.status !== testInfo.expectedStatus) {
       await page?.screenshot({ path: testInfo.outputPath('failure.png') }).catch(() => undefined)
     }
-    await close()
-    await mock.close()
-    expect
-      .soft(
-        gh.unscripted().map((call) => `gh ${call.argv.join(' ')}`),
-        'gh calls nobody scripted',
-      )
-      .toEqual([])
-    expect.soft(pageErrors, 'uncaught errors in the renderer').toEqual([])
-    expect.soft(mock.unexpected, 'model API requests the mock did not expect').toEqual([])
-    expect.soft(mock.pending(), 'scripted model turns nobody consumed').toBe(0)
-    expect
-      .soft(
-        mock.blocked.filter((target) => !RENDERER_HOSTS.includes(target)),
-        'connections attempted beyond loopback',
-      )
-      .toEqual([])
+    try {
+      await close()
+    } finally {
+      await mock.close()
+      expect
+        .soft(
+          gh.unscripted().map((call) => `gh ${call.argv.join(' ')}`),
+          'gh calls nobody scripted',
+        )
+        .toEqual([])
+      expect.soft(pageErrors, 'uncaught errors in the renderer').toEqual([])
+      expect.soft(mock.unexpected, 'model API requests the mock did not expect').toEqual([])
+      expect.soft(mock.pending(), 'scripted model turns nobody consumed').toBe(0)
+      expect
+        .soft(
+          mock.blocked.filter((target) => !RENDERER_HOSTS.includes(target)),
+          'connections attempted beyond loopback',
+        )
+        .toEqual([])
+    }
   },
 })
 

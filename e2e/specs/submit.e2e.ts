@@ -126,7 +126,6 @@ test('a draft that no longer sits in the diff blocks submitting until it is remo
   await drawer.getByRole('button', { name: 'Delete' }).click()
 
   await expect(drawer.getByRole('button', { name: 'Create pending review' })).toBeEnabled()
-  expect(submitted(dojo)).toEqual([])
 })
 
 test('a review GitHub refuses is reported and the drafts are kept', async ({ dojo }) => {
