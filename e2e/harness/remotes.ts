@@ -29,10 +29,12 @@ export interface Manifest {
   }
 }
 
+/** Git never reads the developer's own configuration, in the fixtures or in the app. */
+export const GIT_ISOLATION = { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' }
+
 const GIT_ENV = {
   PATH: process.env.PATH,
-  GIT_CONFIG_GLOBAL: '/dev/null',
-  GIT_CONFIG_NOSYSTEM: '1',
+  ...GIT_ISOLATION,
   GIT_AUTHOR_NAME: 'Fixture Author',
   GIT_AUTHOR_EMAIL: 'author@example.test',
   GIT_COMMITTER_NAME: 'Fixture Author',

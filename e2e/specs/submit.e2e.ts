@@ -1,11 +1,9 @@
 import type { Locator, Page } from '@playwright/test'
 import { failure } from '../harness/gh'
-import { pullRequest, reviewAccepted } from '../harness/world'
+import { pullRequest, reviewAccepted, routes } from '../harness/world'
 import { type LineKind, commentBox, selectLines, startComment } from '../support/diff'
 import { fileCard, openPullRequest, reviewDrawer } from '../support/review'
 import { type Dojo, expect, test } from '../support/test'
-
-const SUBMIT = 'submit acme/widget#7'
 
 async function draft(card: Locator, kind: LineKind, line: number, body: string) {
   await startComment(card, kind, line)
@@ -19,7 +17,8 @@ const openDrawer = (page: Page) =>
     .getByRole('button', { name: /^Review/ })
     .click()
 
-const submitted = (dojo: Dojo) => dojo.gh.calls(SUBMIT).map((call) => JSON.parse(call.stdin) as unknown)
+const submitted = (dojo: Dojo) =>
+  dojo.gh.calls(routes.submit(dojo.prs.widget)).map((call) => JSON.parse(call.stdin) as unknown)
 
 test('a pending review sends the drafts without an event and links to the result', async ({ dojo }) => {
   const pr = dojo.prs.widget
@@ -130,7 +129,7 @@ test('a draft that no longer sits in the diff blocks submitting until it is remo
 
 test('a review GitHub refuses is reported and the drafts are kept', async ({ dojo }) => {
   dojo.gh.set(
-    SUBMIT,
+    routes.submit(dojo.prs.widget),
     failure('gh: Unprocessable Entity: User can only have one pending review per pull request (HTTP 422)'),
   )
   const page = await dojo.launch()

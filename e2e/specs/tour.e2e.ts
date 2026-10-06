@@ -1,6 +1,6 @@
 import { json } from '../harness/gh'
 import { widgetTour } from '../harness/tour'
-import { prView } from '../harness/world'
+import { prView, routes } from '../harness/world'
 import { openPullRequest } from '../support/review'
 import { expect, test } from '../support/test'
 import { TOUR_REQUEST, generateTour } from '../support/tour'
@@ -114,8 +114,8 @@ test('regenerating replaces the tour once the new one is complete', async ({ doj
 test('the agent is told what the linked issue asks for', async ({ dojo }) => {
   const pr = dojo.prs.widget
   const closes = [{ number: 5, url: 'https://github.com/acme/widget/issues/5' }]
-  dojo.gh.set('pr acme/widget#7', json({ ...prView(pr), closingIssuesReferences: closes }))
-  dojo.gh.set('issue acme/widget#5', json({ title: 'Greetings feel flat', body: 'Users asked for warmer wording.' }))
+  dojo.gh.set(routes.pr(pr), json({ ...prView(pr), closingIssuesReferences: closes }))
+  dojo.gh.set(routes.issue(pr, 5), json({ title: 'Greetings feel flat', body: 'Users asked for warmer wording.' }))
   const page = await dojo.launch()
   await openPullRequest(page, pr)
 

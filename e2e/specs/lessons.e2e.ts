@@ -1,6 +1,6 @@
 import { failure } from '../harness/gh'
 import { widgetTour } from '../harness/tour'
-import { type PastComment, pastReviewComments } from '../harness/world'
+import { type PastComment, pastReviewComments, routes } from '../harness/world'
 import { openPullRequest } from '../support/review'
 import { type Dojo, expect, test } from '../support/test'
 import { TOUR_REQUEST, generateTour } from '../support/tour'
@@ -69,7 +69,7 @@ test('refreshing replaces the lessons with what the team says now', async ({ doj
 })
 
 test('a tour is still written when the past review comments cannot be fetched', async ({ dojo }) => {
-  dojo.gh.set('review-comments acme/widget page 1', failure('HTTP 502: Bad Gateway'))
+  dojo.gh.set(routes.reviewComments(dojo.prs.widget, 1), failure('HTTP 502: Bad Gateway'))
   const page = await dojo.launch()
   await openPullRequest(page, dojo.prs.widget)
 

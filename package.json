@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.e2e.json",
     "test": "vitest run",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
-    "e2e:app": "tsx e2e/harness/cli.ts",
+    "test:e2e:watched": "tsx e2e/harness/outbound-watch.ts npm run --silent test:e2e",
+    "e2e:app": "tsx e2e/cli.ts",
     "cli": "tsx src/cli.ts",
     "package": "electron-vite build && electron-builder --mac",
     "format": "prettier --write src e2e electron.vite.config.ts"

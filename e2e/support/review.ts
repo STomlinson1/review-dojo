@@ -1,10 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Locator, Page } from '@playwright/test'
+import { type Locator, type Page, expect } from '@playwright/test'
 import type { ReviewState } from '../../src/shared/types'
 import type { Run } from '../harness/launcher'
 import type { FixturePr } from '../harness/remotes'
-import { expect } from './test'
 
 export async function openPullRequest(page: Page, pr: FixturePr): Promise<void> {
   await page.getByLabel('Open a pull request').fill(pr.url)

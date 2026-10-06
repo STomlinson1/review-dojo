@@ -5,7 +5,7 @@ import { json } from '../harness/gh'
 import { gitEnv } from '../harness/launcher'
 import { MANIFEST } from '../harness/paths'
 import { readManifest } from '../harness/remotes'
-import { prView, pullRequest, stackEntry, threads } from '../harness/world'
+import { prView, pullRequest, routes, stackEntry, threads } from '../harness/world'
 import { commentBox, diffCode, startComment } from '../support/diff'
 import { fileCard, fullDiff, openPullRequest } from '../support/review'
 import { expect, test } from '../support/test'
@@ -36,7 +36,7 @@ test('an opened pull request shows the diff of its head against its base', async
 test('a stacked pull request shows its stack and opens its neighbour', async ({ dojo }) => {
   const { widget, widgetStacked } = dojo.prs
   pullRequest(dojo.gh, widgetStacked)
-  dojo.gh.set('open-prs acme/widget', json([stackEntry(widgetStacked), stackEntry(widget)]))
+  dojo.gh.set(routes.openPrs(widget), json([stackEntry(widgetStacked), stackEntry(widget)]))
   const page = await dojo.launch()
   await openPullRequest(page, widget)
 
@@ -52,7 +52,7 @@ test('a stacked pull request shows its stack and opens its neighbour', async ({ 
 })
 
 test('cancelling an open returns to home with nothing opened', async ({ dojo }) => {
-  dojo.gh.set('pr acme/widget#7', { ...json(prView(dojo.prs.widget)), delayMs: 1500 })
+  dojo.gh.set(routes.pr(dojo.prs.widget), { ...json(prView(dojo.prs.widget)), delayMs: 1500 })
   const page = await dojo.launch()
   await page.getByLabel('Open a pull request').fill(dojo.prs.widget.url)
   await page.getByRole('button', { name: 'Open', exact: true }).click()

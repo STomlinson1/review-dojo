@@ -76,8 +76,12 @@ See [docs/DESIGN.md](docs/DESIGN.md). Clones, worktrees, tours and review progre
 ```sh
 npm test             # unit tests
 npm run test:e2e     # end-to-end tests: builds the app, then drives it with every outside service replaced
+npm run test:e2e:watched  # the same suite under a watcher that samples the app's outbound connections
 npm run typecheck
 ```
+
+The watched run is a backstop that samples connections every 200 ms, not proof of zero connections; the mock's
+proxy tripwire inside the suite is the primary guard.
 
 The end-to-end suite never contacts GitHub or a model provider and does not use your `gh`, `claude` or `codex`
 logins. After `npm install`, run `node node_modules/electron/install.js` once: Electron downloads its binary on

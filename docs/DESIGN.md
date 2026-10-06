@@ -29,6 +29,7 @@ src/renderer   React UI.
 e2e/harness    Hermetic launcher and stand-ins for every process boundary (gh, git remotes, model APIs, keychain).
 e2e/support    Playwright fixture and page helpers.
 e2e/specs      End-to-end specs (*.e2e.ts), one file per flow group.
+e2e/cli.ts     `npm run e2e:app` — the same hermetic app, driven one shell command at a time by an agent.
 ```
 
 ### Data flow

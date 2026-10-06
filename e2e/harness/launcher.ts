@@ -1,7 +1,11 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { Settings } from '../../src/shared/types'
-import { HARNESS, REPO } from './paths'
+import type { ProviderId, Settings } from '../../src/shared/types'
+import { Gh } from './gh'
+import { type Mock, startMock } from './mock-api'
+import { ARTIFACTS, HARNESS, MANIFEST, REPO } from './paths'
+import { GIT_ISOLATION, type Manifest, buildFixtures, readManifest } from './remotes'
+import { pullRequest, signedIn } from './world'
 
 export interface Run {
   dir: string
@@ -14,14 +18,25 @@ export interface Run {
   codexHome: string
 }
 
-export const SEED_SETTINGS: Settings = {
+/** Everything a launched app needs, with the fixture pull request and a signed-in `gh` already scripted. */
+export interface World {
+  run: Run
+  gh: Gh
+  mock: Mock
+  prs: Manifest['prs']
+  args: string[]
+  env: Record<string, string>
+  openedLinks(): string[]
+}
+
+const SEED_SETTINGS: Settings = {
   provider: 'claude',
   claude: { auth: 'apiKey', model: 'claude-opus-5-5', reasoningEffort: 'high' },
   codex: { auth: 'apiKey', model: '', reasoningEffort: 'high' },
   dojoMode: false,
 }
 
-export const BIN = join(HARNESS, 'bin')
+const BIN = join(HARNESS, 'bin')
 
 export function runPaths(dir: string): Run {
   return {
@@ -60,7 +75,7 @@ supports_websockets = false
 }
 
 /** Never overwrites settings.json: a relaunch must see what the app saved. */
-export function prepareRun(dir: string, mockUrl: string, settings: Settings = SEED_SETTINGS): Run {
+function prepareRun(dir: string, mockUrl: string, settings: Settings): Run {
   const run = runPaths(dir)
   for (const path of [run.userData, run.claudeConfig, run.codexHome, join(dir, 'home'), join(dir, 'tmp')]) {
     mkdirSync(path, { recursive: true })
@@ -73,15 +88,14 @@ export function prepareRun(dir: string, mockUrl: string, settings: Settings = SE
 
 export function gitEnv(remotes: string): Record<string, string> {
   return {
-    GIT_CONFIG_GLOBAL: '/dev/null',
-    GIT_CONFIG_NOSYSTEM: '1',
+    ...GIT_ISOLATION,
     GIT_CONFIG_COUNT: '1',
     GIT_CONFIG_KEY_0: `url.file://${remotes}/.insteadOf`,
     GIT_CONFIG_VALUE_0: 'https://github.com/',
   }
 }
 
-export function appEnv(run: Run, mockUrl: string, remotes: string): Record<string, string> {
+function appEnv(run: Run, mockUrl: string, remotes: string): Record<string, string> {
   return {
     PATH: `${BIN}:/usr/bin:/bin`,
     SHELL: join(BIN, 'stub-shell'),
@@ -105,7 +119,7 @@ export function appEnv(run: Run, mockUrl: string, remotes: string): Record<strin
   }
 }
 
-export function appArgs(run: Run, mockUrl: string): string[] {
+function appArgs(run: Run, mockUrl: string): string[] {
   return [
     '-r',
     join(HARNESS, 'hooks/open-links.cjs'),
@@ -115,4 +129,25 @@ export function appArgs(run: Run, mockUrl: string): string[] {
     `--user-data-dir=${run.userData}`,
     `--proxy-server=${mockUrl}`,
   ]
+}
+
+export const openedLinks = (run: Run): string[] =>
+  existsSync(run.openLog) ? readFileSync(run.openLog, 'utf8').split('\n').filter(Boolean) : []
+
+export async function openWorld(dir: string, provider: ProviderId = 'claude'): Promise<World> {
+  const manifest = existsSync(MANIFEST) ? readManifest(MANIFEST) : buildFixtures(ARTIFACTS)
+  const mock = await startMock(runPaths(dir).mockLog)
+  const run = prepareRun(dir, mock.url, { ...SEED_SETTINGS, provider })
+  const gh = new Gh(run.ghScript, run.ghLog)
+  signedIn(gh)
+  pullRequest(gh, manifest.prs.widget)
+  return {
+    run,
+    gh,
+    mock,
+    prs: manifest.prs,
+    args: appArgs(run, mock.url),
+    env: appEnv(run, mock.url, manifest.remotes),
+    openedLinks: () => openedLinks(run),
+  }
 }

@@ -4,8 +4,19 @@ import type { FixturePr } from './remotes'
 
 export const REVIEWER = 'octo-reviewer'
 
-export const slug = (pr: FixturePr) => `${pr.owner}/${pr.repo}`
-export const key = (pr: FixturePr) => `${slug(pr)}#${pr.number}`
+const slug = (pr: FixturePr) => `${pr.owner}/${pr.repo}`
+const key = (pr: FixturePr) => `${slug(pr)}#${pr.number}`
+
+/** The one spelling of each fake gh route (the grammar lives in gh-fake.ts). */
+export const routes = {
+  pr: (pr: FixturePr) => `pr ${key(pr)}`,
+  issue: (pr: FixturePr, number: number) => `issue ${slug(pr)}#${number}`,
+  stack: (pr: FixturePr) => `stack ${key(pr)}`,
+  openPrs: (pr: FixturePr) => `open-prs ${slug(pr)}`,
+  threads: (pr: FixturePr) => `threads ${key(pr)}`,
+  submit: (pr: FixturePr) => `submit ${key(pr)}`,
+  reviewComments: (pr: FixturePr, page: number) => `review-comments ${slug(pr)} page ${page}`,
+}
 
 export interface ThreadFixture {
   id: string
@@ -87,9 +98,9 @@ export function prView(pr: FixturePr) {
 
 /** Scripts everything opening `pr` asks GitHub for: no stack, no threads, no past review comments. */
 export function pullRequest(gh: Gh, pr: FixturePr): void {
-  gh.set(`pr ${key(pr)}`, json(prView(pr)))
-  gh.set(`stack ${key(pr)}`, json({ data: { repository: { pullRequest: { stack: null } } } }))
-  gh.set(`open-prs ${slug(pr)}`, json([stackEntry(pr)]))
+  gh.set(routes.pr(pr), json(prView(pr)))
+  gh.set(routes.stack(pr), json({ data: { repository: { pullRequest: { stack: null } } } }))
+  gh.set(routes.openPrs(pr), json([stackEntry(pr)]))
   threads(gh, pr, [])
   pastReviewComments(gh, pr, [])
 }
@@ -113,18 +124,18 @@ export function threads(gh: Gh, pr: FixturePr, fixtures: ThreadFixture[]): void 
       })),
     },
   }))
-  gh.set(`threads ${key(pr)}`, json([{ data: { repository: { pullRequest: { reviewThreads: { nodes } } } } }]))
+  gh.set(routes.threads(pr), json([{ data: { repository: { pullRequest: { reviewThreads: { nodes } } } } }]))
 }
 
 /** The app reads three pages; `comments` fills the first and the rest stay empty. */
 export function pastReviewComments(gh: Gh, pr: FixturePr, comments: PastComment[]): void {
-  gh.set(`review-comments ${slug(pr)} page 1`, json(comments))
-  gh.set(`review-comments ${slug(pr)} page 2`, json([]))
-  gh.set(`review-comments ${slug(pr)} page 3`, json([]))
+  gh.set(routes.reviewComments(pr, 1), json(comments))
+  gh.set(routes.reviewComments(pr, 2), json([]))
+  gh.set(routes.reviewComments(pr, 3), json([]))
 }
 
 export function reviewAccepted(gh: Gh, pr: FixturePr, reviewId = 1): string {
   const url = `${pr.url}#pullrequestreview-${reviewId}`
-  gh.set(`submit ${key(pr)}`, json({ html_url: url }))
+  gh.set(routes.submit(pr), json({ html_url: url }))
   return url
 }

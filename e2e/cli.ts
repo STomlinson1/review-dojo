@@ -4,14 +4,12 @@ import http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join, resolve } from 'node:path'
 import { chromium, expect } from '@playwright/test'
-import * as diff from '../support/diff'
-import * as review from '../support/review'
-import { Gh, type GhReply } from './gh'
-import { appArgs, appEnv, prepareRun, runPaths } from './launcher'
-import { type Turn, startMock } from './mock-api'
-import { ARTIFACTS, ELECTRON, MANIFEST } from './paths'
-import { buildFixtures, readManifest } from './remotes'
-import { pullRequest, signedIn } from './world'
+import { Gh, type GhReply } from './harness/gh'
+import { openWorld, openedLinks, runPaths } from './harness/launcher'
+import type { Turn } from './harness/mock-api'
+import { ELECTRON } from './harness/paths'
+import * as diff from './support/diff'
+import * as review from './support/review'
 
 interface Session {
   hostPid: number
@@ -93,19 +91,10 @@ async function control(dir: string, path: string, body?: string): Promise<string
 }
 
 async function host(dir: string): Promise<void> {
-  const manifest = existsSync(MANIFEST) ? readManifest(MANIFEST) : buildFixtures(ARTIFACTS)
-  const mock = await startMock(runPaths(dir).mockLog)
-  const run = prepareRun(dir, mock.url)
-  const gh = new Gh(run.ghScript, run.ghLog)
-  signedIn(gh)
-  pullRequest(gh, manifest.prs.widget)
-
+  const { run, mock, args, env } = await openWorld(dir)
   const portFile = join(run.userData, 'DevToolsActivePort')
   rmSync(portFile, { force: true })
-  const app: ChildProcess = spawn(ELECTRON, [...appArgs(run, mock.url), '--remote-debugging-port=0'], {
-    env: appEnv(run, mock.url, manifest.remotes),
-    stdio: 'ignore',
-  })
+  const app: ChildProcess = spawn(ELECTRON, [...args, '--remote-debugging-port=0'], { env, stdio: 'ignore' })
   process.on('exit', () => void app.kill())
   const shutdown = () => {
     rmSync(sessionPath(dir), { force: true })
@@ -214,7 +203,7 @@ async function state(dir: string): Promise<void> {
         ...(JSON.parse(await control(dir, '/state')) as object),
         ghCalls: gh.calls().map((call) => ({ route: call.route, exit: call.exit, stdin: call.stdin })),
         ghUnscripted: gh.unscripted().map((call) => call.argv.join(' ')),
-        openedLinks: existsSync(run.openLog) ? readFileSync(run.openLog, 'utf8').split('\n').filter(Boolean) : [],
+        openedLinks: openedLinks(run),
       },
       null,
       2,

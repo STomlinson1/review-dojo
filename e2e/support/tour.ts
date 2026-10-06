@@ -1,6 +1,6 @@
-import type { Page } from '@playwright/test'
+import { type Page, expect } from '@playwright/test'
 import { type ScriptedTour, widgetTour } from '../harness/tour'
-import { type Dojo, expect } from './test'
+import type { Dojo } from './test'
 
 export const TOUR_REQUEST = 'Prepare a guided tour'
 

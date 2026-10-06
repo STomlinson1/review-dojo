@@ -1,37 +1,22 @@
-import { existsSync, readFileSync } from 'node:fs'
 import { type ElectronApplication, type Page, _electron, test as base, expect } from '@playwright/test'
-import { Gh } from '../harness/gh'
 import type { ProviderId } from '../../src/shared/types'
-import { BIN, type Run, SEED_SETTINGS, appArgs, appEnv, prepareRun, runPaths } from '../harness/launcher'
-import { type Mock, startMock } from '../harness/mock-api'
-import { ELECTRON, MANIFEST } from '../harness/paths'
-import { type Manifest, readManifest } from '../harness/remotes'
-import { pullRequest, signedIn } from '../harness/world'
+import { type World, openWorld } from '../harness/launcher'
+import { ELECTRON } from '../harness/paths'
 
 /** The home screen loads reviewer avatars from GitHub; the proxy refuses them like everything else. */
 const RENDERER_HOSTS = ['avatars.githubusercontent.com:443']
 
-export interface Dojo {
-  run: Run
-  gh: Gh
-  mock: Mock
-  prs: Manifest['prs']
+export interface Dojo extends World {
   launch(): Promise<Page>
   close(): Promise<void>
-  openedLinks(): string[]
 }
 
 export const test = base.extend<{ dojo: Dojo; provider: ProviderId }>({
   provider: ['claude', { option: true }],
 
   dojo: async ({ provider }, use, testInfo) => {
-    const manifest = readManifest(MANIFEST)
-    const dir = testInfo.outputPath('run')
-    const mock = await startMock(runPaths(dir).mockLog)
-    const run = prepareRun(dir, mock.url, { ...SEED_SETTINGS, provider })
-    const gh = new Gh(run.ghScript, run.ghLog)
-    signedIn(gh)
-    pullRequest(gh, manifest.prs.widget)
+    const world = await openWorld(testInfo.outputPath('run'), provider)
+    const { gh, mock } = world
 
     let app = null as ElectronApplication | null
     let page = null as Page | null
@@ -50,28 +35,18 @@ export const test = base.extend<{ dojo: Dojo; provider: ProviderId }>({
 
     const launch = async () => {
       await close()
-      app = await _electron.launch({
-        executablePath: ELECTRON,
-        args: appArgs(run, mock.url),
-        env: appEnv(run, mock.url, manifest.remotes),
-      })
+      app = await _electron.launch({ executablePath: ELECTRON, args: world.args, env: world.env })
       await app.context().tracing.start({ screenshots: true, snapshots: true })
       page = await app.firstWindow()
       page.on('pageerror', (error) => pageErrors.push(error.message))
       const path = await app.evaluate(() => process.env.PATH ?? '')
-      if (path.split(':')[0] !== BIN) throw new Error(`The fake gh is not first on the app's PATH: ${path}`)
+      if (path.split(':')[0] !== world.env.PATH.split(':')[0]) {
+        throw new Error(`The fake gh is not first on the app's PATH: ${path}`)
+      }
       return page
     }
 
-    await use({
-      run,
-      gh,
-      mock,
-      prs: manifest.prs,
-      launch,
-      close,
-      openedLinks: () => (existsSync(run.openLog) ? readFileSync(run.openLog, 'utf8').split('\n').filter(Boolean) : []),
-    })
+    await use({ ...world, launch, close })
 
     if (testInfo.status !== testInfo.expectedStatus) {
       await page?.screenshot({ path: testInfo.outputPath('failure.png') }).catch(() => undefined)
