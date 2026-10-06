@@ -1,7 +1,7 @@
 import { json } from '../harness/gh'
 import { widgetTour } from '../harness/tour'
 import { prView, routes } from '../harness/world'
-import { openPullRequest } from '../support/review'
+import { openPullRequest, tourNav } from '../support/review'
 import { expect, test } from '../support/test'
 import { TOUR_REQUEST, generateTour } from '../support/tour'
 
@@ -16,7 +16,7 @@ test('generating a tour lets the agent read the checkout and shows the finished 
   await page.getByRole('button', { name: 'Generate tour' }).click()
 
   await expect(page.getByText('Greetings gain an exclamation mark and a farewell.')).toBeVisible()
-  const tour = page.getByRole('navigation', { name: 'Tour' })
+  const tour = tourNav(page)
   await expect(tour.getByRole('button', { name: /Friendlier greeting/ })).toBeVisible()
   await expect(tour.getByRole('button', { name: /Farewell helper/ })).toBeVisible()
   await expect(tour.getByRole('button', { name: /Double helper/ })).toBeVisible()
@@ -33,7 +33,7 @@ test('stops are readable while the rest of the tour is still being written', asy
   await page.getByRole('button', { name: 'Generate tour' }).click()
 
   await expect(page.getByText('Still writing the tour: 1 stop so far')).toBeVisible()
-  const tour = page.getByRole('navigation', { name: 'Tour' })
+  const tour = tourNav(page)
   await tour.getByRole('button', { name: /Friendlier greeting/ }).click()
   await expect(page.getByRole('heading', { name: 'Friendlier greeting' })).toBeVisible()
   await expect(tour.getByRole('button', { name: /Farewell helper/ })).toHaveCount(0)
@@ -74,7 +74,7 @@ test('a tour that stays unusable is reported and nothing is shown as a tour', as
   await expect(alert).toContainText("The tour couldn't be generated")
   await expect(alert).toContainText('unusable tour')
   await expect(page.getByRole('button', { name: 'Generate tour' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Tour' })).toHaveCount(0)
+  await expect(tourNav(page)).toHaveCount(0)
 })
 
 test('cancelling generation stops the agent and returns to the empty tour screen', async ({ dojo }) => {

@@ -1,11 +1,10 @@
 import { type Locator, expect } from '@playwright/test'
 
-export type LineKind = 'addition' | 'deletion' | 'context' | 'expanded'
+export type LineKind = 'addition' | 'deletion' | 'expanded'
 
 const LINE_TYPE: Record<LineKind, string> = {
   addition: 'change-addition',
   deletion: 'change-deletion',
-  context: 'context',
   expanded: 'context-expanded',
 }
 

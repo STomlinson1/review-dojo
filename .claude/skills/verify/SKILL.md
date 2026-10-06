@@ -65,7 +65,7 @@ Prompt markers: a tour request contains `Prepare a guided tour`; a repair reques
 a lessons request `Distill the recurring expectations`; a question, grade or polish request contains the text
 you typed. For a full tour, copy the shape from `widgetTour` in `e2e/harness/tour.ts`; hunk ids are in
 `e2e/.artifacts/manifest.json`. A turn with `"hold": true` stays open until
-`npm run --silent e2e:app -- release "$RUN"`.
+`npm run --silent e2e:app -- release "$RUN"`; a third argument is streamed as more of the reply before it ends.
 
 ## 4. Observe
 

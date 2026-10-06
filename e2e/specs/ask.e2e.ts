@@ -2,7 +2,7 @@ import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { commentBox, selectLines, startComment } from '../support/diff'
-import { fileCard, openPullRequest } from '../support/review'
+import { fileCard, openPullRequest, tourNav } from '../support/review'
 import { type Dojo, expect, test } from '../support/test'
 import { generateTour } from '../support/tour'
 
@@ -12,8 +12,7 @@ async function openAskOnFirstStop(dojo: Dojo) {
   const page = await dojo.launch()
   await openPullRequest(page, dojo.prs.widget)
   await generateTour(dojo, page)
-  await page
-    .getByRole('navigation', { name: 'Tour' })
+  await tourNav(page)
     .getByRole('button', { name: /Friendlier greeting/ })
     .click()
   await page.getByRole('banner').getByRole('button', { name: 'Ask', exact: true }).click()

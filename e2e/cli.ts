@@ -23,7 +23,7 @@ const USAGE = `usage: npm run e2e:app -- <command> <run-dir> [argument]
   start <run-dir>             launch the built app with every stand-in; prints the session
   step  <run-dir> '<js>'      run an async function body with page, expect, diff and review in scope
   turns <run-dir> '<json>'    queue model turns: a JSON array of mock-api Turn objects
-  release <run-dir> ['<rest>']  finish held model replies
+  release <run-dir> ['<text>']  finish held model replies, streaming the text first
   gh    <run-dir> <route> '<json>'   set the fake gh reply for a route: {"stdout","stderr","exit","delayMs"}
   state <run-dir>             print what reached the boundaries and what the stand-ins refused
   stop  <run-dir>             quit the app and its stand-ins`
@@ -220,9 +220,10 @@ async function main(): Promise<void> {
   else if (command === 'step') await step(dir, rest[0] ?? '')
   else if (command === 'turns') console.log(await control(dir, '/turns', rest[0]))
   else if (command === 'release') console.log(await control(dir, '/release', rest[0] ?? ''))
-  else if (command === 'gh')
-    new Gh(runPaths(dir).ghScript, runPaths(dir).ghLog).set(rest[0], JSON.parse(rest[1]) as GhReply)
-  else if (command === 'state') await state(dir)
+  else if (command === 'gh') {
+    const run = runPaths(dir)
+    new Gh(run.ghScript, run.ghLog).set(rest[0], JSON.parse(rest[1]) as GhReply)
+  } else if (command === 'state') await state(dir)
   else if (command === 'stop') stop(dir)
   else usage()
 }
