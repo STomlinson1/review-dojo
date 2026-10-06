@@ -55,23 +55,47 @@ test('malformed turns are refused with a message while the app stays up', async 
   expect(existsSync(`${dir}/session.json`)).toBe(false)
 })
 
-test("stop leaves a process alone when a stale session names a pid that is not this run's app", async ({}, testInfo) => {
-  const dir = testInfo.outputPath('run')
+/** A session file whose pids now belong to unrelated live processes, as after a crash and pid reuse. */
+function writeStaleSession(dir: string, hostPid: number, appPid: number): void {
   mkdirSync(dir, { recursive: true })
-  const deadHost = spawnSync('true').pid
-  const bystander = spawn('sleep', ['60'])
+  writeFileSync(join(dir, 'session.json'), JSON.stringify({ hostPid, appPid, cdpPort: 1, controlPort: 1 }))
+}
+
+test("stop leaves processes alone when a stale session names pids that are not this run's host or app", async ({}, testInfo) => {
+  const dir = testInfo.outputPath('run')
+  const host = spawn('sleep', ['60'])
+  const app = spawn('sleep', ['60'])
   try {
-    writeFileSync(
-      join(dir, 'session.json'),
-      JSON.stringify({ hostPid: deadHost, appPid: bystander.pid, cdpPort: 1, controlPort: 1 }),
-    )
+    writeStaleSession(dir, host.pid!, app.pid!)
 
     expect(cli('stop', dir).status).toBe(0)
 
-    expect(processState(bystander.pid!)).toMatch(/^S/)
+    expect(processState(host.pid!)).toMatch(/^S/)
+    expect(processState(app.pid!)).toMatch(/^S/)
     expect(existsSync(join(dir, 'session.json'))).toBe(false)
   } finally {
+    host.kill()
+    app.kill()
+  }
+})
+
+test("start replaces a stale session whose host pid is alive but is not this run's host", async ({}, testInfo) => {
+  test.setTimeout(60_000)
+  const dir = testInfo.outputPath('run')
+  const bystander = spawn('sleep', ['60'])
+  let session = { hostPid: 0, appPid: 0 }
+  try {
+    writeStaleSession(dir, bystander.pid!, bystander.pid!)
+
+    const started = cli('start', dir)
+
+    expect(started.stderr).toBe('')
+    session = JSON.parse(started.stdout) as typeof session
+    expect(session.hostPid).not.toBe(bystander.pid)
+    expect(processState(bystander.pid!)).toMatch(/^S/)
+  } finally {
     bystander.kill()
+    await stopAndWait(dir, [session.hostPid, session.appPid].filter(Boolean))
   }
 })
 

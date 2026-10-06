@@ -138,15 +138,25 @@ function isRunning(pid: number): boolean {
 }
 
 /** A pid from a stale session file may belong to anything by now. */
+function commandOf(pid: number): string {
+  if (!isRunning(pid)) return ''
+  try {
+    return execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' })
+  } catch {
+    return ''
+  }
+}
+
 function isThisRunsApp(pid: number, dir: string): boolean {
-  if (!isRunning(pid)) return false
-  const command = execFileSync('ps', ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8' })
+  const command = commandOf(pid)
   return command.includes('Electron') && command.includes(runPaths(dir).userData)
 }
 
+const isThisRunsHost = (pid: number, dir: string): boolean => commandOf(pid).includes(` host ${dir}`)
+
 function stop(dir: string): void {
   const session = readSession(dir)
-  if (isRunning(session.hostPid)) {
+  if (isThisRunsHost(session.hostPid, dir)) {
     process.kill(session.hostPid, 'SIGTERM')
     return
   }
@@ -162,7 +172,9 @@ function usage(): never {
 
 async function start(dir: string): Promise<void> {
   if (existsSync(sessionPath(dir))) {
-    if (isRunning(readSession(dir).hostPid)) throw new Error(`An app is already running for ${dir}. Stop it first.`)
+    if (isThisRunsHost(readSession(dir).hostPid, dir)) {
+      throw new Error(`An app is already running for ${dir}. Stop it first.`)
+    }
     stop(dir)
   }
   const child = spawn(process.execPath, [...process.execArgv, import.meta.filename, 'host', dir], {
