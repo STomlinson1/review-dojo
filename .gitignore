@@ -5,3 +5,4 @@ dist
 .DS_Store
 *.tsbuildinfo
 e2e/.artifacts
+__pycache__

@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Wait for the next worker_done, question or escalation on the bound run and print it.
+
+usage: wait [timeout-ms]
+
+Heartbeat-only deliveries are acknowledged and skipped. A printed delivery is NOT acknowledged:
+process it, then run settle (for a worker_done) or `orca orchestration check --ack <delivery>`.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+from lib import orca
+
+timeout = sys.argv[1] if len(sys.argv) > 1 else "540000"
+ack: list[str] = []
+while True:
+    result = orca(
+        "orchestration", "check", *ack, "--wait", "--types", "worker_done,escalation,question", "--timeout-ms", timeout
+    )["result"]
+    messages = [m for m in result.get("messages", []) if m["type"] != "heartbeat"]
+    delivery = result.get("deliveryId")
+    if messages:
+        print("DELIVERY", delivery)
+        for m in messages:
+            print(f"{m['type']} | {m['subject']} | from {m['from_handle']} | id {m['id']}")
+            print(m["payload"])
+            print(m["body"])
+        break
+    if result.get("timedOut") or result.get("waitInterrupted") or not delivery:
+        print("no message:", "timed out" if result.get("timedOut") else result.get("waitInterrupted") or "empty")
+        break
+    ack = ["--ack", delivery]

@@ -26,3 +26,14 @@ One entry per run of the feature workflow: what dragged, what it cost, and a pro
   Proposed fix: record these in the project's working notes (TOM-43) and disable the shell's update prompt.
 - **No cost total.** Orca workers do not report token use to the coordinator, so the ledger has no per-run
   number. Proposed fix: have each worker put its session cost in its completion message.
+
+## 2026-10-13, fixes applied from the TOM-41 entry
+
+- Plan stage building the feature, per-test mutations, plan-as-record: now project rules in `CLAUDE.md`
+  ("Changes to the feature workflow for this project").
+- Orca environment notes: now in `CLAUDE.md` ("Snags"). Still open: the oh-my-zsh update prompt itself is the
+  owner's shell setting.
+- No cost total: `tools/orca/settle` records each worker's session cost before releasing it and
+  `tools/orca/cost` totals it. Not yet exercised on a real worker.
+- Run workspace split across checkouts: the ledger and the cost record are resolved from the main checkout by
+  the helpers. Briefs and reviews still land in the worktree's `.sdd`; `sdd-workspace` is unchanged.
